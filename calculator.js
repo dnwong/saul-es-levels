@@ -102,17 +102,18 @@ function buildRawLevels(data) {
     add(mid(data.overnightHigh, data.overnightLow), 'ON 50%', 'tag-50pct', 2);
   }
 
-  // ── Floor pivot + R/S levels ──────────────────────────────────────────────
+  // ── Floor pivot + 6-point grid ───────────────────────────────────────────
   if (data.prevdayHigh !== null && data.prevdayLow !== null && data.prevdayClose !== null) {
     const pv = floorPivot(data.prevdayHigh, data.prevdayLow, data.prevdayClose, data.prevdayOpen);
-    add(pv.p,  'Pivot',  'tag-pivot',   4);
-    add(pv.r1, 'R1',     'tag-pivot-r', 3);
-    add(pv.r2, 'R2',     'tag-pivot-r', 3);
-    add(pv.r3, 'R3',     'tag-pivot-r', 2);
-    add(pv.s1, 'S1',     'tag-pivot-s', 3);
-    add(pv.s2, 'S2',     'tag-pivot-s', 3);
-    add(pv.s3, 'S3',     'tag-pivot-s', 2);
+    add(pv.p, 'Pivot', 'tag-pivot', 4);
     data._pivot = pv.p;
+
+    // 6-point grid above and below pivot (10 levels each direction)
+    const STEP = 6;
+    for (let i = 1; i <= 10; i++) {
+      add(round4(pv.p + i * STEP), `+${i * STEP}`, 'tag-pivot-r', 2);
+      add(round4(pv.p - i * STEP), `-${i * STEP}`, 'tag-pivot-s', 2);
+    }
   }
 
   // ── Bollinger Bands ───────────────────────────────────────────────────────
@@ -230,7 +231,23 @@ function calculate() {
     return;
   }
 
-  const groups = mergeConfluences(rawLevels, window);
+  // Anchor price: pivot if available, else midpoint of overnight, else prev close
+  const anchor = data._pivot
+    ?? (data.overnightHigh && data.overnightLow ? mid(data.overnightHigh, data.overnightLow) : null)
+    ?? data.prevdayClose;
+
+  // Filter: keep grid levels always, keep multi-TF levels only within ±150 pts of anchor
+  const RANGE = 150;
+  const filteredLevels = anchor !== null
+    ? rawLevels.filter(l =>
+        l.tagClass === 'tag-pivot' ||
+        l.tagClass === 'tag-pivot-r' ||
+        l.tagClass === 'tag-pivot-s' ||
+        Math.abs(l.price - anchor) <= RANGE
+      )
+    : rawLevels;
+
+  const groups = mergeConfluences(filteredLevels, window);
   const maxWeight = groups[0]?.totalWeight || 1;
 
   // Always include the pivot group if it exists
@@ -272,7 +289,7 @@ function calculate() {
   if (data._pivot !== null) {
     // Show full pivot suite in badge
     const pv = floorPivot(data.prevdayHigh, data.prevdayLow, data.prevdayClose, data.prevdayOpen);
-    pivotBadge.textContent = `Pivot: ${pv.p.toFixed(2)}  R1:${pv.r1.toFixed(2)}  R2:${pv.r2.toFixed(2)}  R3:${pv.r3.toFixed(2)}  S1:${pv.s1.toFixed(2)}  S2:${pv.s2.toFixed(2)}  S3:${pv.s3.toFixed(2)}`;
+    pivotBadge.textContent = `Pivot: ${pv.p.toFixed(2)}  Grid: ±6 pts`;
     pivotBadge.classList.remove('hidden');
 
     // Debug: show what prev day data was used
@@ -376,7 +393,7 @@ function calculate() {
   const rawList = document.getElementById('raw-list');
   rawSection.classList.remove('hidden');
 
-  const sortedRaw = [...rawLevels].sort((a, b) => b.price - a.price);
+  const sortedRaw = [...filteredLevels].sort((a, b) => b.price - a.price);
   rawList.innerHTML = `<div class="raw-grid">` +
     sortedRaw.map(l => `
       <div class="raw-item">
