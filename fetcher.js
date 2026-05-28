@@ -155,34 +155,61 @@ async function fetchAndFill(symbol) {
   const bb = bollingerBands(closes);
 
   // ── Overnight & late-day from intraday bars ───────────────────────────────
-  // Overnight = 6:00 pm ET yesterday → 9:30 am ET today (pre-market Globex)
-  // Late day  = 2:00 pm ET → 4:00 pm ET yesterday
-  // ET offset: UTC-4 (EDT) or UTC-5 (EST) — use UTC-4 as approximation
-  const ET_OFFSET_MS = 4 * 3600 * 1000;
+  // ET offset: UTC-4 (EDT) or UTC-5 (EST)
+  // Detect DST: EDT = UTC-4 (Mar-Nov), EST = UTC-5 (Nov-Mar)
+  const janOffset = new Date(now.getFullYear(), 0, 1).getTimezoneOffset();
+  const julOffset = new Date(now.getFullYear(), 6, 1).getTimezoneOffset();
+  const isDST = now.getTimezoneOffset() < Math.max(janOffset, julOffset);
+  const ET_OFFSET_MS = (isDST ? 4 : 5) * 3600 * 1000;
 
   function toET(ms) { return ms - ET_OFFSET_MS; }
+  function fromET(etMs) { return etMs + ET_OFFSET_MS; }
 
-  const todayET = toET(now.getTime());
-  const todayDateET = new Date(todayET);
+  const nowET = toET(now.getTime());
+  const todayDateET = new Date(nowET);
   todayDateET.setHours(0, 0, 0, 0);
-  const todayMidnightET = todayDateET.getTime() + ET_OFFSET_MS; // back to UTC ms
+  const todayMidnightUTC = fromET(todayDateET.getTime());
+  const yestMidnightUTC  = todayMidnightUTC - 86400000;
 
-  // Yesterday midnight ET
-  const yestMidnightET = todayMidnightET - 86400000;
+  // RTH window: 9:30am–4:15pm ET
+  const RTH_START = 9.5  * 3600000;
+  const RTH_END   = 16.25 * 3600000;
 
-  // Overnight window: yesterday 6pm ET → today 9:30am ET
-  const onStart = yestMidnightET + 18 * 3600000;
-  const onEnd   = todayMidnightET + 9.5 * 3600000;
+  // Previous RTH session bars
+  const prevRTHBars = intraBars.filter(b => {
+    const offsetInDay = b.t - yestMidnightUTC;
+    return offsetInDay >= RTH_START && offsetInDay <= RTH_END;
+  });
 
-  // Late day window: yesterday 2pm ET → yesterday 4pm ET
-  const ldStart = yestMidnightET + 14 * 3600000;
-  const ldEnd   = yestMidnightET + 16 * 3600000;
+  // Overnight window: yesterday 4:15pm ET → today 9:30am ET
+  const onStart = yestMidnightUTC  + RTH_END;
+  const onEnd   = todayMidnightUTC + RTH_START;
+
+  // Late day window: yesterday 2:00pm–4:00pm ET
+  const ldStart = yestMidnightUTC + 14 * 3600000;
+  const ldEnd   = yestMidnightUTC + 16 * 3600000;
 
   const onBars = intraBars.filter(b => b.t >= onStart && b.t <= onEnd);
   const ldBars = intraBars.filter(b => b.t >= ldStart && b.t <= ldEnd);
 
   const overnight = rangeHL(onBars);
   const lateday   = rangeHL(ldBars);
+
+  // ── Prev day RTH OHLC (for accurate pivot calculation) ────────────────────
+  // Use intraday RTH bars if available, fall back to daily bar
+  let prevH, prevL, prevC, prevO;
+  if (prevRTHBars.length > 0) {
+    prevH = round4(Math.max(...prevRTHBars.map(b => b.h)));
+    prevL = round4(Math.min(...prevRTHBars.map(b => b.l)));
+    prevO = round4(prevRTHBars[0].o);
+    prevC = round4(prevRTHBars[prevRTHBars.length - 1].c);
+  } else {
+    // Fallback to daily bar (includes pre/post — less accurate for pivot)
+    prevH = prevDayBar ? round4(prevDayBar.h) : null;
+    prevL = prevDayBar ? round4(prevDayBar.l) : null;
+    prevC = prevDayBar ? round4(prevDayBar.c) : null;
+    prevO = prevDayBar ? round4(prevDayBar.o) : null;
+  }
 
   // ── Fill inputs ───────────────────────────────────────────────────────────
   const fields = {
@@ -196,10 +223,10 @@ async function fetchAndFill(symbol) {
     'month-low':     month.l,
     'week-high':     week.h,
     'week-low':      week.l,
-    'prevday-high':  prevDayBar ? round4(prevDayBar.h) : null,
-    'prevday-low':   prevDayBar ? round4(prevDayBar.l) : null,
-    'prevday-close': prevDayBar ? round4(prevDayBar.c) : null,
-    'prevday-open':  prevDayBar ? round4(prevDayBar.o) : null,
+    'prevday-high':  prevH,
+    'prevday-low':   prevL,
+    'prevday-close': prevC,
+    'prevday-open':  prevO,
     'overnight-high': overnight.h,
     'overnight-low':  overnight.l,
     'lateday-high':  lateday.h,
@@ -222,7 +249,8 @@ async function fetchAndFill(symbol) {
   document.getElementById('auto-badge').classList.remove('hidden');
 
   const onNote = onBars.length === 0 ? ' (overnight bars unavailable — fill manually)' : '';
-  setStatus('ok', `Filled ${filled} fields from Yahoo Finance${onNote}`);
+  const rthNote = prevRTHBars.length > 0 ? ' · prev day RTH' : ' · prev day (daily bar fallback)';
+  setStatus('ok', `Filled ${filled} fields from Yahoo Finance${rthNote}${onNote}`);
 }
 
 // ─── Status helper ────────────────────────────────────────────────────────────
