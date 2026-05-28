@@ -17,17 +17,25 @@ function mid(h, l) {
 
 /**
  * Floor pivot calculation (classic floor trader formula).
- * Pivot = (H + L + C) / 3
- * Some floor traders also include the open: (H + L + C + O) / 4
- * Shaoul uses a "proprietary" variant; we use the open-inclusive version
- * when open is available, otherwise the classic 3-point pivot.
+ * Returns pivot + R1/R2/R3 + S1/S2/S3
  */
 function floorPivot(h, l, c, o = null) {
-  if (o !== null) {
-    return Math.round(((h + l + c + o) / 4) * 4) / 4;
-  }
-  return Math.round(((h + l + c) / 3) * 4) / 4;
+  // Shaoul uses open-inclusive when available
+  const p = o !== null
+    ? Math.round(((h + l + c + o) / 4) * 4) / 4
+    : Math.round(((h + l + c) / 3) * 4) / 4;
+
+  const r1 = round4(2 * p - l);
+  const r2 = round4(p + (h - l));
+  const r3 = round4(h + 2 * (p - l));
+  const s1 = round4(2 * p - h);
+  const s2 = round4(p - (h - l));
+  const s3 = round4(l - 2 * (h - p));
+
+  return { p, r1, r2, r3, s1, s2, s3 };
 }
+
+function round4(v) { return Math.round(v * 4) / 4; }
 
 // ─── Level builder ──────────────────────────────────────────────────────────
 
@@ -92,11 +100,17 @@ function buildRawLevels(data) {
     add(mid(data.overnightHigh, data.overnightLow), 'ON 50%', 'tag-50pct', 2);
   }
 
-  // ── Floor pivot ───────────────────────────────────────────────────────────
+  // ── Floor pivot + R/S levels ──────────────────────────────────────────────
   if (data.prevdayHigh !== null && data.prevdayLow !== null && data.prevdayClose !== null) {
-    const pivot = floorPivot(data.prevdayHigh, data.prevdayLow, data.prevdayClose, data.prevdayOpen);
-    add(pivot, 'Floor Pivot', 'tag-pivot', 4);
-    data._pivot = pivot; // store for bias calculation
+    const pv = floorPivot(data.prevdayHigh, data.prevdayLow, data.prevdayClose, data.prevdayOpen);
+    add(pv.p,  'Pivot',  'tag-pivot',   4);
+    add(pv.r1, 'R1',     'tag-pivot-r', 3);
+    add(pv.r2, 'R2',     'tag-pivot-r', 3);
+    add(pv.r3, 'R3',     'tag-pivot-r', 2);
+    add(pv.s1, 'S1',     'tag-pivot-s', 3);
+    add(pv.s2, 'S2',     'tag-pivot-s', 3);
+    add(pv.s3, 'S3',     'tag-pivot-s', 2);
+    data._pivot = pv.p;
   }
 
   // ── Bollinger Bands ───────────────────────────────────────────────────────
@@ -172,7 +186,7 @@ function scoreDotsHTML(weight, maxWeight) {
 }
 
 function isPivot(members) {
-  return members.some(m => m.tagClass === 'tag-pivot');
+  return members.some(m => m.tagClass === 'tag-pivot' && m.label === 'Pivot');
 }
 
 // ─── Main calculate ──────────────────────────────────────────────────────────
@@ -233,7 +247,7 @@ function calculate() {
   const biasText = document.getElementById('bias-text');
 
   if (data._pivot !== null) {
-    pivotBadge.textContent = `Floor Pivot: ${data._pivot.toFixed(2)}`;
+    pivotBadge.textContent = `Pivot: ${data._pivot.toFixed(2)}`;
     pivotBadge.classList.remove('hidden');
 
     // Bias: use overnight close (overnight low as proxy if no close available)

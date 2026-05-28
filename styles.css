@@ -300,6 +300,8 @@ header h1 {
 .tag-lateday { background: rgba(251,146,60,0.2); color: #fdba74; }
 .tag-50pct   { background: rgba(99,102,241,0.2); color: #a5b4fc; }
 .tag-pivot   { background: rgba(124,92,252,0.35); color: #c4b5fd; border: 1px solid rgba(124,92,252,0.5); }
+.tag-pivot-r { background: rgba(34,197,94,0.2);  color: #86efac; border: 1px solid rgba(34,197,94,0.3); }
+.tag-pivot-s { background: rgba(239,68,68,0.2);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
 .tag-bb      { background: rgba(6,182,212,0.2);  color: #67e8f9; }
 .tag-pattern { background: rgba(244,63,94,0.2);  color: #fda4af; }
 
