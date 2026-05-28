@@ -241,7 +241,28 @@ function calculate() {
   // Sort by price high to low
   topGroups.sort((a, b) => b.centerPrice - a.centerPrice);
 
-  // ── Pivot badge & bias bar ────────────────────────────────────────────────
+  // ── Debug panel — always show what data was received ─────────────────────
+  const dbg = document.getElementById('debug-panel');
+  dbg.classList.remove('hidden');
+
+  if (data.prevdayHigh !== null && data.prevdayLow !== null && data.prevdayClose !== null) {
+    const pv = floorPivot(data.prevdayHigh, data.prevdayLow, data.prevdayClose, data.prevdayOpen);
+    dbg.innerHTML = `
+      <strong>Prev Day:</strong>
+      H: ${data.prevdayHigh} &nbsp; L: ${data.prevdayLow} &nbsp; C: ${data.prevdayClose} &nbsp; O: ${data.prevdayOpen ?? '—'}
+      &nbsp;|&nbsp; <strong>Formula:</strong> ${data.prevdayOpen !== null ? '(H+L+C+O)/4' : '(H+L+C)/3'}
+      &nbsp;|&nbsp; <strong>Pivot:</strong> ${pv.p} &nbsp; R1:${pv.r1} R2:${pv.r2} R3:${pv.r3} &nbsp; S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}
+    `;
+  } else {
+    dbg.innerHTML = `
+      <strong>Prev Day data missing:</strong>
+      H: ${data.prevdayHigh ?? '❌'} &nbsp;
+      L: ${data.prevdayLow  ?? '❌'} &nbsp;
+      C: ${data.prevdayClose ?? '❌'} &nbsp;
+      O: ${data.prevdayOpen  ?? '❌'}
+      — check that Fetch Live Data completed successfully.
+    `;
+  }
   const pivotBadge = document.getElementById('pivot-badge');
   const biasBar = document.getElementById('bias-bar');
   const biasText = document.getElementById('bias-text');
