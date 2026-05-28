@@ -1,0 +1,7 @@
+services:
+  es-levels:
+    build: .
+    container_name: es-levels
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

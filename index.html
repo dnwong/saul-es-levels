@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Saul Shaoul ES Key Levels</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>ES Key Levels Calculator</h1>
+      <p class="subtitle">Saul Shaoul Multi-Timeframe Methodology</p>
+    </header>
+
+    <!-- FETCH BAR -->
+    <div class="fetch-bar">
+      <div class="fetch-left">
+        <label class="fetch-label">Symbol
+          <input type="text" id="symbol-input" value="ES=F" placeholder="ES=F" />
+        </label>
+        <button id="fetch-btn" class="btn-fetch">⬇ Fetch Live Data</button>
+        <span id="fetch-status" class="fetch-status"></span>
+      </div>
+      <div class="fetch-right">
+        <span class="fetch-note">Data via Yahoo Finance · fields auto-filled, manual override allowed</span>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <!-- INPUT PANEL -->
+      <section class="input-panel">
+        <h2>Timeframe Data <span class="auto-badge hidden" id="auto-badge">AUTO-FILLED</span></h2>
+
+        <div class="tf-group">
+          <h3>Life of Contract</h3>
+          <div class="input-row">
+            <label>High <input type="number" id="life-high" placeholder="e.g. 6166" step="0.25" /></label>
+            <label>Low  <input type="number" id="life-low"  placeholder="e.g. 800"  step="0.25" /></label>
+          </div>
+        </div>
+
+        <div class="tf-group">
+          <h3>Year</h3>
+          <div class="input-row">
+            <label>High <input type="number" id="year-high" step="0.25" /></label>
+            <label>Low  <input type="number" id="year-low"  step="0.25" /></label>
+          </div>
+        </div>
+
+        <div class="tf-group">
+          <h3>Quarter</h3>
+          <div class="input-row">
+            <label>High <input type="number" id="quarter-high" step="0.25" /></label>
+            <label>Low  <input type="number" id="quarter-low"  step="0.25" /></label>
+          </div>
+        </div>
+
+        <div class="tf-group">
+          <h3>Month</h3>
+          <div class="input-row">
+            <label>High <input type="number" id="month-high" step="0.25" /></label>
+            <label>Low  <input type="number" id="month-low"  step="0.25" /></label>
+          </div>
+        </div>
+
+        <div class="tf-group">
+          <h3>Week</h3>
+          <div class="input-row">
+            <label>High <input type="number" id="week-high" step="0.25" /></label>
+            <label>Low  <input type="number" id="week-low"  step="0.25" /></label>
+          </div>
+        </div>
+
+        <div class="tf-group">
+          <h3>Previous Day</h3>
+          <div class="input-row">
+            <label>High  <input type="number" id="prevday-high"  step="0.25" /></label>
+            <label>Low   <input type="number" id="prevday-low"   step="0.25" /></label>
+            <label>Close <input type="number" id="prevday-close" step="0.25" /></label>
+            <label>Open  <input type="number" id="prevday-open"  step="0.25" /></label>
+          </div>
+        </div>
+
+        <div class="tf-group">
+          <h3>Overnight / Globex</h3>
+          <div class="input-row">
+            <label>High <input type="number" id="overnight-high" step="0.25" /></label>
+            <label>Low  <input type="number" id="overnight-low"  step="0.25" /></label>
+          </div>
+        </div>
+
+        <div class="tf-group">
+          <h3>Late Day (2–4 pm)</h3>
+          <div class="input-row">
+            <label>High <input type="number" id="lateday-high" step="0.25" /></label>
+            <label>Low  <input type="number" id="lateday-low"  step="0.25" /></label>
+          </div>
+        </div>
+
+        <div class="tf-group">
+          <h3>Bollinger Bands <span class="tf-note">(auto-calculated or manual)</span></h3>
+          <div class="input-row">
+            <label>Upper  <input type="number" id="bb-upper"  step="0.25" /></label>
+            <label>Middle <input type="number" id="bb-middle" step="0.25" /></label>
+            <label>Lower  <input type="number" id="bb-lower"  step="0.25" /></label>
+          </div>
+        </div>
+
+        <div class="tf-group">
+          <h3>Settings</h3>
+          <div class="input-row">
+            <label>Confluence window (pts)
+              <input type="number" id="confluence-window" value="3" min="0.25" step="0.25" />
+            </label>
+            <label>Max levels
+              <input type="number" id="max-levels" value="15" min="5" max="30" step="1" />
+            </label>
+          </div>
+        </div>
+
+        <button id="calculate-btn" class="btn-primary">Calculate Key Levels</button>
+        <button id="clear-btn" class="btn-ghost">Clear All</button>
+      </section>
+
+      <!-- OUTPUT PANEL -->
+      <section class="output-panel">
+        <div class="output-header">
+          <h2>Key Levels</h2>
+          <div id="pivot-badge" class="pivot-badge hidden"></div>
+        </div>
+
+        <div id="bias-bar" class="bias-bar hidden">
+          <span id="bias-text"></span>
+        </div>
+
+        <div id="levels-table-wrap">
+          <p class="placeholder-text">Click "Fetch Live Data" to auto-fill, then "Calculate Key Levels"</p>
+        </div>
+
+        <div id="confluence-section" class="hidden">
+          <h3>Confluence Zones</h3>
+          <div id="confluence-list"></div>
+        </div>
+
+        <div id="raw-section" class="hidden">
+          <h3>All Raw Levels</h3>
+          <div id="raw-list"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="fetcher.js"></script>
+  <script src="calculator.js"></script>
+</body>
+</html>
