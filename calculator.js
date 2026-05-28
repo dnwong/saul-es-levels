@@ -250,12 +250,33 @@ function calculate() {
   const groups = mergeConfluences(filteredLevels, window);
   const maxWeight = groups[0]?.totalWeight || 1;
 
+  // Ensure there is exactly one pivot group — merge any duplicates
+  const pivotGroups = groups.filter(g => isPivot(g.members));
+  if (pivotGroups.length > 1) {
+    // Keep the first, merge others into it
+    const primary = pivotGroups[0];
+    for (let i = 1; i < pivotGroups.length; i++) {
+      primary.members.push(...pivotGroups[i].members);
+      primary.totalWeight += pivotGroups[i].totalWeight;
+      // Remove the duplicate from groups
+      const idx = groups.indexOf(pivotGroups[i]);
+      if (idx > -1) groups.splice(idx, 1);
+    }
+    const totalW = primary.members.reduce((s, m) => s + m.weight, 0);
+    primary.centerPrice = round4(
+      primary.members.reduce((s, m) => s + m.price * m.weight, 0) / totalW
+    );
+  }
+
   // Split into above/at/below pivot groups
   const pivotPrice = data._pivot;
   let aboveGroups, pivotGroup, belowGroups;
 
   if (pivotPrice !== null) {
-    pivotGroup  = groups.find(g => isPivot(g.members));
+    pivotGroup = groups.find(g => isPivot(g.members));
+
+    // Force pivot group centerPrice to exact pivot value
+    if (pivotGroup) pivotGroup.centerPrice = pivotPrice;
 
     aboveGroups = groups.filter(g => g !== pivotGroup && g.centerPrice > pivotPrice)
                         .sort((a, b) => a.centerPrice - b.centerPrice);
