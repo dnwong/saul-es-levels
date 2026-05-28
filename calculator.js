@@ -250,15 +250,32 @@ function calculate() {
   const groups = mergeConfluences(filteredLevels, window);
   const maxWeight = groups[0]?.totalWeight || 1;
 
-  // Always include the pivot group if it exists
-  const pivotGroup = groups.find(g => isPivot(g.members));
-  let topGroups = groups.slice(0, maxLevels);
-  if (pivotGroup && !topGroups.includes(pivotGroup)) {
-    topGroups.push(pivotGroup);
-  }
+  // Split into above/at/below pivot groups
+  const pivotPrice = data._pivot;
+  let aboveGroups, pivotGroup, belowGroups;
 
-  // Sort by price high to low
-  topGroups.sort((a, b) => b.centerPrice - a.centerPrice);
+  if (pivotPrice !== null) {
+    aboveGroups = groups.filter(g => g.centerPrice > pivotPrice)
+                        .sort((a, b) => a.centerPrice - b.centerPrice); // low→high above pivot
+    belowGroups = groups.filter(g => g.centerPrice < pivotPrice)
+                        .sort((a, b) => b.centerPrice - a.centerPrice); // high→low below pivot
+    pivotGroup  = groups.find(g => isPivot(g.members));
+
+    // Take up to half maxLevels each side
+    const half = Math.floor((maxLevels - 1) / 2);
+    aboveGroups = aboveGroups.slice(-half).reverse(); // closest above first, then higher
+    belowGroups = belowGroups.slice(0, half);
+
+    // Rebuild topGroups: above (high→low) + pivot + below (high→low)
+    let topGroups = [...aboveGroups];
+    if (pivotGroup) topGroups.push(pivotGroup);
+    topGroups = topGroups.concat(belowGroups);
+    // Already sorted high→low by construction
+    var finalGroups = topGroups;
+  } else {
+    // No pivot — just take top N by weight, sort high→low
+    var finalGroups = groups.slice(0, maxLevels).sort((a, b) => b.centerPrice - a.centerPrice);
+  }
 
   // ── Debug panel — always show what data was received ─────────────────────
   const dbg = document.getElementById('debug-panel');
@@ -352,7 +369,7 @@ function calculate() {
       <tbody>
   `;
 
-  topGroups.forEach((g, i) => {
+  finalGroups.forEach((g, i) => {
     const hasPivot = isPivot(g.members);
     const priceClass = hasPivot ? 'level-price pivot-price' : 'level-price';
     const tags = g.members.map(m => tagHTML(m.label, m.tagClass)).join('');
