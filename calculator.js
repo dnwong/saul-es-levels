@@ -247,8 +247,31 @@ function calculate() {
   const biasText = document.getElementById('bias-text');
 
   if (data._pivot !== null) {
-    pivotBadge.textContent = `Pivot: ${data._pivot.toFixed(2)}`;
+    // Show full pivot suite in badge
+    const pv = floorPivot(data.prevdayHigh, data.prevdayLow, data.prevdayClose, data.prevdayOpen);
+    pivotBadge.textContent = `Pivot: ${pv.p.toFixed(2)}  R1:${pv.r1.toFixed(2)}  R2:${pv.r2.toFixed(2)}  R3:${pv.r3.toFixed(2)}  S1:${pv.s1.toFixed(2)}  S2:${pv.s2.toFixed(2)}  S3:${pv.s3.toFixed(2)}`;
     pivotBadge.classList.remove('hidden');
+
+    // Debug: show what prev day data was used
+    console.log('Prev Day → H:', data.prevdayHigh, 'L:', data.prevdayLow, 'C:', data.prevdayClose, 'O:', data.prevdayOpen);
+    console.log('Pivot suite:', pv);
+
+    // Show debug panel
+    const dbg = document.getElementById('debug-panel');
+    dbg.classList.remove('hidden');
+    dbg.innerHTML = `
+      <strong>Prev Day used for pivot:</strong>
+      H: ${data.prevdayHigh ?? '—'} &nbsp;
+      L: ${data.prevdayLow  ?? '—'} &nbsp;
+      C: ${data.prevdayClose ?? '—'} &nbsp;
+      O: ${data.prevdayOpen  ?? '—'}
+      &nbsp;|&nbsp;
+      <strong>Formula:</strong> ${data.prevdayOpen !== null ? '(H+L+C+O)/4' : '(H+L+C)/3'}
+      &nbsp;|&nbsp;
+      <strong>Pivot:</strong> ${pv.p} &nbsp;
+      R1:${pv.r1} R2:${pv.r2} R3:${pv.r3} &nbsp;
+      S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}
+    `;
 
     // Bias: use overnight close (overnight low as proxy if no close available)
     const lastPrice = data.overnightHigh !== null && data.overnightLow !== null

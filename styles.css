@@ -469,3 +469,15 @@ header h1 {
   text-transform: none;
   letter-spacing: 0;
 }
+
+.debug-panel {
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.25);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.debug-panel strong { color: var(--yellow); }
