@@ -216,7 +216,16 @@ function calculate() {
 
   const groups = mergeConfluences(rawLevels, window);
   const maxWeight = groups[0]?.totalWeight || 1;
-  const topGroups = groups.slice(0, maxLevels);
+
+  // Always include the pivot group if it exists
+  const pivotGroup = groups.find(g => isPivot(g.members));
+  let topGroups = groups.slice(0, maxLevels);
+  if (pivotGroup && !topGroups.includes(pivotGroup)) {
+    topGroups.push(pivotGroup);
+  }
+
+  // Sort by price high to low
+  topGroups.sort((a, b) => b.centerPrice - a.centerPrice);
 
   // ── Pivot badge & bias bar ────────────────────────────────────────────────
   const pivotBadge = document.getElementById('pivot-badge');
