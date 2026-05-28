@@ -20,10 +20,12 @@ function mid(h, l) {
  * Returns pivot + R1/R2/R3 + S1/S2/S3
  */
 function floorPivot(h, l, c, o = null) {
-  // Shaoul uses open-inclusive when available
-  const p = o !== null
-    ? Math.round(((h + l + c + o) / 4) * 4) / 4
-    : Math.round(((h + l + c) / 3) * 4) / 4;
+  // Shaoul's floor pivot: weights open double, rounds to nearest 0.25
+  // Formula: (H + L + C + 2×O) / 5  — falls back to (H+L+C)/3 if no open
+  const raw = o !== null
+    ? (h + l + c + 2 * o) / 5
+    : (h + l + c) / 3;
+  const p = round4(raw);
 
   const r1 = round4(2 * p - l);
   const r2 = round4(p + (h - l));
@@ -287,7 +289,7 @@ function calculate() {
       C: ${data.prevdayClose ?? '—'} &nbsp;
       O: ${data.prevdayOpen  ?? '—'}
       &nbsp;|&nbsp;
-      <strong>Formula:</strong> ${data.prevdayOpen !== null ? '(H+L+C+O)/4' : '(H+L+C)/3'}
+      <strong>Formula:</strong> ${data.prevdayOpen !== null ? '(H+L+C+2O)/5' : '(H+L+C)/3'}
       &nbsp;|&nbsp;
       <strong>Pivot:</strong> ${pv.p} &nbsp;
       R1:${pv.r1} R2:${pv.r2} R3:${pv.r3} &nbsp;
