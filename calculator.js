@@ -255,22 +255,20 @@ function calculate() {
   let aboveGroups, pivotGroup, belowGroups;
 
   if (pivotPrice !== null) {
-    aboveGroups = groups.filter(g => g.centerPrice > pivotPrice)
-                        .sort((a, b) => a.centerPrice - b.centerPrice); // low→high above pivot
-    belowGroups = groups.filter(g => g.centerPrice < pivotPrice)
-                        .sort((a, b) => b.centerPrice - a.centerPrice); // high→low below pivot
     pivotGroup  = groups.find(g => isPivot(g.members));
 
-    // Take up to half maxLevels each side
+    aboveGroups = groups.filter(g => g !== pivotGroup && g.centerPrice > pivotPrice)
+                        .sort((a, b) => a.centerPrice - b.centerPrice);
+    belowGroups = groups.filter(g => g !== pivotGroup && g.centerPrice < pivotPrice)
+                        .sort((a, b) => b.centerPrice - a.centerPrice);
+
     const half = Math.floor((maxLevels - 1) / 2);
-    aboveGroups = aboveGroups.slice(-half).reverse(); // closest above first, then higher
+    aboveGroups = aboveGroups.slice(-half).reverse();
     belowGroups = belowGroups.slice(0, half);
 
-    // Rebuild topGroups: above (high→low) + pivot + below (high→low)
     let topGroups = [...aboveGroups];
     if (pivotGroup) topGroups.push(pivotGroup);
     topGroups = topGroups.concat(belowGroups);
-    // Already sorted high→low by construction
     var finalGroups = topGroups;
   } else {
     // No pivot — just take top N by weight, sort high→low
