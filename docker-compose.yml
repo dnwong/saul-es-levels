@@ -1,6 +1,6 @@
 services:
   es-levels:
-    build: .
+    image: ${DOCKERHUB_USERNAME:-dnwong}/saul-es-levels:latest
     container_name: es-levels
     ports:
       - "8080:8080"
