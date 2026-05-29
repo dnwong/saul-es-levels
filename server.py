@@ -56,8 +56,8 @@ class Handler(SimpleHTTPRequestHandler):
                     # Log last bar OHLC for debugging
                     if bars:
                         import datetime
-                        last_t = datetime.datetime.utcfromtimestamp(bars[-1]).strftime('%Y-%m-%d')
-                        prev_t = datetime.datetime.utcfromtimestamp(bars[-2]).strftime('%Y-%m-%d') if len(bars) > 1 else '?'
+                        last_t = datetime.datetime.fromtimestamp(bars[-1], tz=datetime.timezone.utc).strftime('%Y-%m-%d')
+                        prev_t = datetime.datetime.fromtimestamp(bars[-2], tz=datetime.timezone.utc).strftime('%Y-%m-%d') if len(bars) > 1 else '?'
                         print(f"[proxy] {meta.get('symbol')} {meta.get('dataGranularity')} "
                               f"bars={len(bars)} "
                               f"prev({prev_t}) H={q['high'][-2]:.2f} L={q['low'][-2]:.2f} "
@@ -94,7 +94,7 @@ class Handler(SimpleHTTPRequestHandler):
                 import datetime
                 rows = []
                 for i in range(max(0, len(ts)-10), len(ts)):
-                    d = datetime.datetime.utcfromtimestamp(ts[i]).strftime('%Y-%m-%d %H:%M')
+                    d = datetime.datetime.fromtimestamp(ts[i], tz=datetime.timezone.utc).strftime('%Y-%m-%d %H:%M')
                     rows.append({
                         "date": d,
                         "open":  round(q['open'][i] or 0, 2),
