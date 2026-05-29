@@ -45,6 +45,16 @@ class Handler(SimpleHTTPRequestHandler):
                 with urllib.request.urlopen(req, timeout=15) as resp:
                     raw = resp.read()
                 data = json.loads(raw)
+                # Log first result meta for debugging
+                try:
+                    r = data['chart']['result'][0]
+                    meta = r.get('meta', {})
+                    print(f"[proxy] {target.split('?')[0].split('/')[-1]} "
+                          f"interval={meta.get('dataGranularity')} "
+                          f"range={meta.get('range')} "
+                          f"bars={len(r.get('timestamp', []))}")
+                except Exception:
+                    pass
                 self._respond(200, data)
             except urllib.error.HTTPError as e:
                 self._respond(e.code, {"error": str(e)})
