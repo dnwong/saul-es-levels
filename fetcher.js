@@ -155,8 +155,7 @@ async function fetchAndFill(symbol) {
   const bb = bollingerBands(closes);
 
   // ── Overnight & late-day from intraday bars ───────────────────────────────
-  // ET offset: UTC-4 (EDT) or UTC-5 (EST)
-  // Detect DST: EDT = UTC-4 (Mar-Nov), EST = UTC-5 (Nov-Mar)
+  // ET offset: detect DST
   const janOffset = new Date(now.getFullYear(), 0, 1).getTimezoneOffset();
   const julOffset = new Date(now.getFullYear(), 6, 1).getTimezoneOffset();
   const isDST = now.getTimezoneOffset() < Math.max(janOffset, julOffset);
@@ -165,38 +164,72 @@ async function fetchAndFill(symbol) {
   function toET(ms) { return ms - ET_OFFSET_MS; }
   function fromET(etMs) { return etMs + ET_OFFSET_MS; }
 
-  const nowET = toET(now.getTime());
-  const todayDateET = new Date(nowET);
-  todayDateET.setHours(0, 0, 0, 0);
-  const todayMidnightUTC = fromET(todayDateET.getTime());
-  const yestMidnightUTC  = todayMidnightUTC - 86400000;
+  // RTH = 9:30am–4:15pm ET (in ms from midnight)
+  const RTH_START_MS = 9.5   * 3600000;
+  const RTH_END_MS   = 16.25 * 3600000;
 
-  // RTH window: 9:30am–4:15pm ET
-  const RTH_START = 9.5  * 3600000;
-  const RTH_END   = 16.25 * 3600000;
+  // Group intraday bars by ET calendar date
+  function etDateKey(utcMs) {
+    const d = new Date(toET(utcMs));
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function etMidnightUTC(utcMs) {
+    const d = new Date(toET(utcMs));
+    d.setHours(0, 0, 0, 0);
+    return fromET(d.getTime());
+  }
 
-  // Previous RTH session bars
-  const prevRTHBars = intraBars.filter(b => {
-    const offsetInDay = b.t - yestMidnightUTC;
-    return offsetInDay >= RTH_START && offsetInDay <= RTH_END;
-  });
+  const barsByDate = {};
+  for (const b of intraBars) {
+    const key = etDateKey(b.t);
+    if (!barsByDate[key]) barsByDate[key] = [];
+    barsByDate[key].push(b);
+  }
 
-  // Overnight window: yesterday 4:15pm ET → today 9:30am ET
-  const onStart = yestMidnightUTC  + RTH_END;
-  const onEnd   = todayMidnightUTC + RTH_START;
+  const nowDateKey = etDateKey(now.getTime());
+  const sortedDates = Object.keys(barsByDate).sort().reverse(); // newest first
 
-  // Late day window: yesterday 2:00pm–4:00pm ET
-  const ldStart = yestMidnightUTC + 14 * 3600000;
-  const ldEnd   = yestMidnightUTC + 16 * 3600000;
+  // Find last complete RTH session (not today, at least 20 bars in RTH window)
+  let prevRTHBars = [];
+  let prevSessionKey = null;
 
-  const onBars = intraBars.filter(b => b.t >= onStart && b.t <= onEnd);
+  for (const dateKey of sortedDates) {
+    if (dateKey === nowDateKey) continue;
+    const bars = barsByDate[dateKey];
+    const midnight = etMidnightUTC(bars[0].t);
+    const rth = bars.filter(b => {
+      const off = b.t - midnight;
+      return off >= RTH_START_MS && off <= RTH_END_MS;
+    });
+    if (rth.length >= 20) {
+      prevRTHBars = rth;
+      prevSessionKey = dateKey;
+      break;
+    }
+  }
+
+  // Overnight: prev session close (4:15pm ET) → today open (9:30am ET)
+  const todayMidnightUTC = etMidnightUTC(now.getTime());
+  const onEnd   = todayMidnightUTC + RTH_START_MS;
+  const onStart = prevRTHBars.length > 0
+    ? etMidnightUTC(prevRTHBars[0].t) + RTH_END_MS
+    : todayMidnightUTC - 86400000 + RTH_END_MS;
+
+  // Late day: prev session 2:00pm–4:00pm ET
+  const ldStart = prevRTHBars.length > 0
+    ? etMidnightUTC(prevRTHBars[0].t) + 14 * 3600000
+    : todayMidnightUTC - 86400000 + 14 * 3600000;
+  const ldEnd = prevRTHBars.length > 0
+    ? etMidnightUTC(prevRTHBars[0].t) + 16 * 3600000
+    : todayMidnightUTC - 86400000 + 16 * 3600000;
+
+  const onBars = intraBars.filter(b => b.t > onStart && b.t <= onEnd);
   const ldBars = intraBars.filter(b => b.t >= ldStart && b.t <= ldEnd);
 
   const overnight = rangeHL(onBars);
   const lateday   = rangeHL(ldBars);
 
   // ── Prev day RTH OHLC (for accurate pivot calculation) ────────────────────
-  // Use intraday RTH bars if available, fall back to daily bar
   let prevH, prevL, prevC, prevO;
   if (prevRTHBars.length > 0) {
     prevH = round4(Math.max(...prevRTHBars.map(b => b.h)));
@@ -204,7 +237,7 @@ async function fetchAndFill(symbol) {
     prevO = round4(prevRTHBars[0].o);
     prevC = round4(prevRTHBars[prevRTHBars.length - 1].c);
   } else {
-    // Fallback to daily bar (includes pre/post — less accurate for pivot)
+    // Fallback to daily bar
     prevH = prevDayBar ? round4(prevDayBar.h) : null;
     prevL = prevDayBar ? round4(prevDayBar.l) : null;
     prevC = prevDayBar ? round4(prevDayBar.c) : null;
@@ -248,8 +281,8 @@ async function fetchAndFill(symbol) {
 
   document.getElementById('auto-badge').classList.remove('hidden');
 
-  const onNote = onBars.length === 0 ? ' (overnight bars unavailable — fill manually)' : '';
-  const rthNote = prevRTHBars.length > 0 ? ' · prev day RTH' : ' · prev day (daily bar fallback)';
+  const onNote = onBars.length === 0 ? ' (overnight unavailable)' : '';
+  const rthNote = prevSessionKey ? ` · RTH ${prevSessionKey}` : ' · daily bar fallback';
   setStatus('ok', `Filled ${filled} fields from Yahoo Finance${rthNote}${onNote}`);
 }
 
