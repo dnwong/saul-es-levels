@@ -165,15 +165,6 @@ async function fetchAndFill(symbol) {
   const bb = bollingerBands(closes);
 
   // ── Overnight & late-day from intraday bars ───────────────────────────────
-  // ET offset: detect DST
-  const janOffset = new Date(now.getFullYear(), 0, 1).getTimezoneOffset();
-  const julOffset = new Date(now.getFullYear(), 6, 1).getTimezoneOffset();
-  const isDST = now.getTimezoneOffset() < Math.max(janOffset, julOffset);
-  const ET_OFFSET_MS = (isDST ? 4 : 5) * 3600 * 1000;
-
-  function toET(ms) { return ms - ET_OFFSET_MS; }
-  function fromET(etMs) { return etMs + ET_OFFSET_MS; }
-
   // RTH = 9:30am–4:15pm ET (in ms from midnight)
   const RTH_START_MS = 9.5   * 3600000;
   const RTH_END_MS   = 16.25 * 3600000;
@@ -239,13 +230,37 @@ async function fetchAndFill(symbol) {
   const overnight = rangeHL(onBars);
   const lateday   = rangeHL(ldBars);
 
+  // ── ET offset (needed for date comparisons) ──────────────────────────────
+  const janOffset = new Date(now.getFullYear(), 0, 1).getTimezoneOffset();
+  const julOffset = new Date(now.getFullYear(), 6, 1).getTimezoneOffset();
+  const isDST = now.getTimezoneOffset() < Math.max(janOffset, julOffset);
+  const ET_OFFSET_MS = (isDST ? 4 : 5) * 3600 * 1000;
+
+  function toET(ms) { return ms - ET_OFFSET_MS; }
+  function fromET(etMs) { return etMs + ET_OFFSET_MS; }
+
   // ── Prev day RTH OHLC from RTH daily bars ────────────────────────────────
-  // RTH daily bars exclude pre/post market — accurate H/L/C/O for pivot
-  const todayStr = now.toDateString();
+  // Yahoo futures daily bars start at 00:00 ET (04:00 UTC in EDT).
+  // "Today" in ET terms: if it's before 17:00 ET (next session open), use yesterday's bar.
+  const nowET = new Date(now.getTime() - ET_OFFSET_MS);
+  const nowETHour = nowET.getUTCHours() + nowET.getUTCMinutes() / 60;
+
+  // Build a date string in ET for comparison (YYYY-MM-DD)
+  function etDateStr(utcMs) {
+    const d = new Date(utcMs - ET_OFFSET_MS);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  }
+
+  const todayETStr = etDateStr(now.getTime());
+
+  // Find the most recent bar whose ET date is before today ET
   let prevRTHDayBar = null;
   for (let i = rthDailyBars.length - 1; i >= 0; i--) {
-    const barDate = new Date(rthDailyBars[i].t).toDateString();
-    if (barDate !== todayStr) { prevRTHDayBar = rthDailyBars[i]; break; }
+    const barETStr = etDateStr(rthDailyBars[i].t);
+    if (barETStr < todayETStr) {
+      prevRTHDayBar = rthDailyBars[i];
+      break;
+    }
   }
   if (!prevRTHDayBar && rthDailyBars.length > 0) {
     prevRTHDayBar = rthDailyBars[rthDailyBars.length - 1];
