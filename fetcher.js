@@ -89,13 +89,24 @@ async function fetchAndFill(symbol) {
 
   let dailyBars, intraBars;
 
-  // ── 1. Daily bars (5 years) ───────────────────────────────────────────────
+  // ── 1. Daily bars — two fetches: with and without pre/post market
+  //    RTH daily bars (includePrePost=false) used for pivot calculation
+  //    Full daily bars (includePrePost=true) used for life/year/quarter H/L
   try {
-    const dailyResult = await yahooFetch(symbol, '1d', '5y');
+    const dailyResult = await yahooFetch(symbol, '1d', '5y', true);
     dailyBars = parseOHLC(dailyResult);
   } catch (e) {
     setStatus('error', `Fetch failed: ${e.message}. Check your internet connection or try again.`);
     return;
+  }
+
+  let rthDailyBars = [];
+  try {
+    const rthResult = await yahooFetch(symbol, '1d', '1mo', false);
+    rthDailyBars = parseOHLC(rthResult);
+  } catch (e) {
+    console.warn('RTH daily fetch failed, falling back to full daily:', e.message);
+    rthDailyBars = dailyBars;
   }
 
   if (dailyBars.length === 0) {
@@ -228,20 +239,22 @@ async function fetchAndFill(symbol) {
   const overnight = rangeHL(onBars);
   const lateday   = rangeHL(ldBars);
 
-  // ── Prev day RTH OHLC (for accurate pivot calculation) ────────────────────
-  let prevH, prevL, prevC, prevO;
-  if (prevRTHBars.length > 0) {
-    prevH = round4(Math.max(...prevRTHBars.map(b => b.h)));
-    prevL = round4(Math.min(...prevRTHBars.map(b => b.l)));
-    prevO = round4(prevRTHBars[0].o);
-    prevC = round4(prevRTHBars[prevRTHBars.length - 1].c);
-  } else {
-    // Fallback to daily bar
-    prevH = prevDayBar ? round4(prevDayBar.h) : null;
-    prevL = prevDayBar ? round4(prevDayBar.l) : null;
-    prevC = prevDayBar ? round4(prevDayBar.c) : null;
-    prevO = prevDayBar ? round4(prevDayBar.o) : null;
+  // ── Prev day RTH OHLC from RTH daily bars ────────────────────────────────
+  // RTH daily bars exclude pre/post market — accurate H/L/C/O for pivot
+  const todayStr = now.toDateString();
+  let prevRTHDayBar = null;
+  for (let i = rthDailyBars.length - 1; i >= 0; i--) {
+    const barDate = new Date(rthDailyBars[i].t).toDateString();
+    if (barDate !== todayStr) { prevRTHDayBar = rthDailyBars[i]; break; }
   }
+  if (!prevRTHDayBar && rthDailyBars.length > 0) {
+    prevRTHDayBar = rthDailyBars[rthDailyBars.length - 1];
+  }
+
+  let prevH = prevRTHDayBar ? round4(prevRTHDayBar.h) : null;
+  let prevL = prevRTHDayBar ? round4(prevRTHDayBar.l) : null;
+  let prevC = prevRTHDayBar ? round4(prevRTHDayBar.c) : null;
+  let prevO = prevRTHDayBar ? round4(prevRTHDayBar.o) : null;
 
   // ── Fill inputs ───────────────────────────────────────────────────────────
   const fields = {
@@ -281,7 +294,7 @@ async function fetchAndFill(symbol) {
   document.getElementById('auto-badge').classList.remove('hidden');
 
   const onNote = onBars.length === 0 ? ' (overnight unavailable)' : '';
-  const rthNote = prevSessionKey ? ` · RTH ${prevSessionKey}` : ' · daily bar fallback';
+  const rthNote = prevRTHDayBar ? ` · RTH ${new Date(prevRTHDayBar.t).toLocaleDateString()}` : ' · daily bar fallback';
   setStatus('ok', `Filled ${filled} fields from Yahoo Finance${rthNote}${onNote}`);
 }
 
