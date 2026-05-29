@@ -17,7 +17,7 @@ async function yahooFetch(symbol, interval, range, prePost = true) {
     `?interval=${interval}&range=${range}&includePrePost=${prePost}`;
 
   const res = await fetch(LOCAL_PROXY + encodeURIComponent(url), {
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(20000),
   });
 
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -89,30 +89,22 @@ async function fetchAndFill(symbol) {
 
   let dailyBars, intraBars;
 
-  // ── 1. Daily bars — two fetches: with and without pre/post market
-  //    RTH daily bars (includePrePost=false) used for pivot calculation
-  //    Full daily bars (includePrePost=true) used for life/year/quarter H/L
+  // ── 1. Daily bars (5 years) ───────────────────────────────────────────────
   try {
     const dailyResult = await yahooFetch(symbol, '1d', '5y', true);
     dailyBars = parseOHLC(dailyResult);
   } catch (e) {
-    setStatus('error', `Fetch failed: ${e.message}. Check your internet connection or try again.`);
+    setStatus('error', `Fetch failed: ${e.message}`);
     return;
-  }
-
-  let rthDailyBars = [];
-  try {
-    const rthResult = await yahooFetch(symbol, '1d', '1mo', false);
-    rthDailyBars = parseOHLC(rthResult);
-  } catch (e) {
-    console.warn('RTH daily fetch failed, falling back to full daily:', e.message);
-    rthDailyBars = dailyBars;
   }
 
   if (dailyBars.length === 0) {
     setStatus('error', 'No daily bars returned. Check symbol.');
     return;
   }
+
+  // Use the same daily bars for prev day (RTH fetch doesn't help for futures)
+  const rthDailyBars = dailyBars;
 
   // ── 2. Intraday 5m bars — RTH only, 1 month range for reliable prev session
   try {
