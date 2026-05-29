@@ -12,9 +12,9 @@ const LOCAL_PROXY = '/proxy?url=';
 
 // ─── Fetch wrapper ────────────────────────────────────────────────────────────
 
-async function yahooFetch(symbol, interval, range) {
+async function yahooFetch(symbol, interval, range, prePost = true) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` +
-    `?interval=${interval}&range=${range}&includePrePost=true`;
+    `?interval=${interval}&range=${range}&includePrePost=${prePost}`;
 
   const res = await fetch(LOCAL_PROXY + encodeURIComponent(url), {
     signal: AbortSignal.timeout(15000),
@@ -103,12 +103,11 @@ async function fetchAndFill(symbol) {
     return;
   }
 
-  // ── 2. Intraday 5m bars (5 days) ─────────────────────────────────────────
+  // ── 2. Intraday 5m bars — RTH only, 1 month range for reliable prev session
   try {
-    const intraResult = await yahooFetch(symbol, '5m', '5d');
+    const intraResult = await yahooFetch(symbol, '5m', '1mo', false);
     intraBars = parseOHLC(intraResult);
   } catch (e) {
-    // Non-fatal — overnight/lateday will just be empty
     intraBars = [];
     console.warn('Intraday fetch failed:', e.message);
   }
