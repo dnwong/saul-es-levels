@@ -85,7 +85,7 @@ function startOfWeek(d) {
 // ─── Main fetch & fill ────────────────────────────────────────────────────────
 
 async function fetchAndFill(symbol) {
-  setStatus('loading', `Fetching ${symbol} (trying proxies…)`);
+  setStatus('loading', `Fetching ${symbol}…`);
 
   let dailyBars, intraBars;
 
