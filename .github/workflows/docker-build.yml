@@ -33,8 +33,7 @@ jobs:
           WEBHOOK: ${{ secrets.PORTAINER_WEBHOOK }}
         run: |
           if [ -n "$WEBHOOK" ]; then
-            curl -s -X POST "$WEBHOOK"
-            echo "Portainer redeploy triggered"
+            curl -s -X POST "$WEBHOOK" --max-time 10 || echo "Webhook unreachable (Portainer may be on local network)"
           else
             echo "No PORTAINER_WEBHOOK secret set, skipping"
           fi
