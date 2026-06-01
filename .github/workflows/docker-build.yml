@@ -29,9 +29,12 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/saul-es-levels:${{ github.sha }}
 
       - name: Trigger Portainer redeploy
-        if: ${{ secrets.PORTAINER_WEBHOOK != '' }}
         env:
           WEBHOOK: ${{ secrets.PORTAINER_WEBHOOK }}
         run: |
-          curl -s -X POST "$WEBHOOK"
-          echo "Portainer redeploy triggered"
+          if [ -n "$WEBHOOK" ]; then
+            curl -s -X POST "$WEBHOOK"
+            echo "Portainer redeploy triggered"
+          else
+            echo "No PORTAINER_WEBHOOK secret set, skipping"
+          fi
