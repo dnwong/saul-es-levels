@@ -128,21 +128,11 @@ async function fetchAndFill(symbol) {
   const week    = rangeHL(wkBars);
 
   // ── Prev day bar ──────────────────────────────────────────────────────────
-  // Yahoo futures daily bars: last bar = most recently completed session.
-  // During market hours today's bar may appear as the last entry — skip it
-  // if its ET date matches today AND the market is currently open.
+  // Always skip today's bar — we want the last fully completed session.
   const todayETStr = etDateStr(now.getTime());
-  const nowETHour  = new Date(toET(now.getTime())).getUTCHours() +
-                     new Date(toET(now.getTime())).getUTCMinutes() / 60;
-  const marketOpen = nowETHour >= 9.5 && nowETHour < 16.25;
-
   let prevDayBar = null;
   for (let i = dailyBars.length - 1; i >= 0; i--) {
-    const barET = etDateStr(dailyBars[i].t);
-    // Skip today's bar only if market is currently open (partial bar)
-    if (barET === todayETStr && marketOpen) continue;
-    prevDayBar = dailyBars[i];
-    break;
+    if (etDateStr(dailyBars[i].t) < todayETStr) { prevDayBar = dailyBars[i]; break; }
   }
   if (!prevDayBar) prevDayBar = dailyBars[dailyBars.length - 1];
 
