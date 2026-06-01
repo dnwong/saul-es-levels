@@ -30,6 +30,8 @@ jobs:
 
       - name: Trigger Portainer redeploy
         if: ${{ secrets.PORTAINER_WEBHOOK != '' }}
+        env:
+          WEBHOOK: ${{ secrets.PORTAINER_WEBHOOK }}
         run: |
-          curl -s -X POST "${{ secrets.PORTAINER_WEBHOOK }}"
+          curl -s -X POST "$WEBHOOK"
           echo "Portainer redeploy triggered"
