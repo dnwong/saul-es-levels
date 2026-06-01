@@ -27,3 +27,9 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/saul-es-levels:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/saul-es-levels:${{ github.sha }}
+
+      - name: Trigger Portainer redeploy
+        if: ${{ secrets.PORTAINER_WEBHOOK != '' }}
+        run: |
+          curl -s -X POST "${{ secrets.PORTAINER_WEBHOOK }}"
+          echo "Portainer redeploy triggered"
