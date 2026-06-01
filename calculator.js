@@ -455,6 +455,7 @@ function clearAll() {
   document.getElementById('auto-badge').classList.add('hidden');
   document.getElementById('fetch-status').textContent = '';
   document.getElementById('fetch-status').className = 'fetch-status';
+  document.getElementById('pivot-preview').classList.add('hidden');
 }
 
 // ─── Event listeners ─────────────────────────────────────────────────────────
@@ -462,7 +463,30 @@ function clearAll() {
 document.getElementById('calculate-btn').addEventListener('click', calculate);
 document.getElementById('clear-btn').addEventListener('click', clearAll);
 
-// Allow Enter key to trigger calculation
 document.querySelectorAll('.input-row input').forEach(el => {
   el.addEventListener('keydown', e => { if (e.key === 'Enter') calculate(); });
+});
+
+// ── Live pivot preview as user types the RTH close ────────────────────────
+function updatePivotPreview() {
+  const h = v('prevday-high');
+  const l = v('prevday-low');
+  const c = v('prevday-close');
+  const o = v('prevday-open');
+  const preview = document.getElementById('pivot-preview');
+  if (!preview) return;
+
+  if (h && l && c) {
+    const pv = floorPivot(h, l, c, o);
+    preview.classList.remove('hidden');
+    preview.innerHTML = `Pivot → <strong>${pv.p.toFixed(2)}</strong>` +
+      `&nbsp; +6:${(pv.p+6).toFixed(2)} +12:${(pv.p+12).toFixed(2)}` +
+      `&nbsp; -6:${(pv.p-6).toFixed(2)} -12:${(pv.p-12).toFixed(2)}`;
+  } else {
+    preview.classList.add('hidden');
+  }
+}
+
+['prevday-high','prevday-low','prevday-close','prevday-open'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updatePivotPreview);
 });

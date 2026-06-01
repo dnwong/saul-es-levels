@@ -79,9 +79,13 @@
           <div class="input-row">
             <label>High  <input type="number" id="prevday-high"  step="0.25" /></label>
             <label>Low   <input type="number" id="prevday-low"   step="0.25" /></label>
-            <label>Close <input type="number" id="prevday-close" step="0.25" /></label>
+            <label class="close-label">
+              RTH Close <span class="close-hint">enter manually</span>
+              <input type="number" id="prevday-close" step="0.25" placeholder="4:15pm ET close" class="close-input" />
+            </label>
             <label>Open  <input type="number" id="prevday-open"  step="0.25" /></label>
           </div>
+          <div id="pivot-preview" class="pivot-preview hidden"></div>
         </div>
 
         <div class="tf-group">

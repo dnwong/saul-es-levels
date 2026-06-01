@@ -202,7 +202,7 @@ async function fetchAndFill(symbol) {
     'week-low':       week.l,
     'prevday-high':   prevDayBar ? round4(prevDayBar.h) : null,
     'prevday-low':    prevDayBar ? round4(prevDayBar.l) : null,
-    'prevday-close':  prevRTHClose ?? (prevDayBar ? round4(prevDayBar.c) : null),
+    'prevday-close':  null,   // must be entered manually — RTH close (4:15pm ET)
     'prevday-open':   prevDayBar ? round4(prevDayBar.o) : null,
     'overnight-high': overnight.h,
     'overnight-low':  overnight.l,
@@ -220,9 +220,9 @@ async function fetchAndFill(symbol) {
   }
 
   document.getElementById('auto-badge').classList.remove('hidden');
-  const rthNote = prevDayBar ? ` · prev day ${etDateStr(prevDayBar.t)}${prevRTHClose ? ' (RTH close)' : ''}` : '';
+  const rthNote = prevDayBar ? ` · prev day ${etDateStr(prevDayBar.t)}` : '';
   const onNote  = onBars.length === 0 ? ' · overnight unavailable' : '';
-  setStatus('ok', `Filled ${filled} fields${rthNote}${onNote}`);
+  setStatus('ok', `Filled ${filled} fields${rthNote}${onNote} · enter RTH close to get pivot`);
 }
 
 // ─── Status & button ──────────────────────────────────────────────────────────
