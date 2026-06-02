@@ -136,20 +136,23 @@ async function fetchAndFill(symbol) {
   }
   if (!prevDayBar) prevDayBar = dailyBars[dailyBars.length - 1];
 
-  // ── Prev day RTH close from intraday bars ─────────────────────────────────
-  // Yahoo daily bar close = Globex session close (~5pm ET), not RTH close (4:15pm ET).
-  // Use the last 5m bar at or before 4:15pm ET on the prev day for accurate RTH close.
-  let prevRTHClose = null;
-  if (intraBars.length > 0) {
+  // ── Prev day RTH OHLC from 5m intraday bars ───────────────────────────────
+  // Saul uses RTH-only H/L/O/C (9:30am–4:15pm ET), not the full Globex session.
+  // This gives a narrower, more accurate range for pivot calculation.
+  let prevRTHClose = null, prevRTHHigh = null, prevRTHLow = null, prevRTHOpen = null;
+  if (intraBars.length > 0 && prevDayBar) {
     const prevDateStr = etDateStr(prevDayBar.t);
     const prevMidnightUTC = etMidnightUTC(prevDayBar.t);
-    const rthEnd = prevMidnightUTC + 16.25 * 3600000; // 4:15pm ET
-    const rthStart = prevMidnightUTC + 9.5 * 3600000; // 9:30am ET
-    const prevRTHBars = intraBars
+    const rthStart = prevMidnightUTC + 9.5  * 3600000;
+    const rthEnd   = prevMidnightUTC + 16.25 * 3600000;
+    const rthBars  = intraBars
       .filter(b => etDateStr(b.t) === prevDateStr && b.t >= rthStart && b.t <= rthEnd)
       .sort((a, b) => a.t - b.t);
-    if (prevRTHBars.length > 0) {
-      prevRTHClose = round4(prevRTHBars[prevRTHBars.length - 1].c);
+    if (rthBars.length >= 10) {
+      prevRTHOpen  = round4(rthBars[0].o);
+      prevRTHClose = round4(rthBars[rthBars.length - 1].c);
+      prevRTHHigh  = round4(Math.max(...rthBars.map(b => b.h)));
+      prevRTHLow   = round4(Math.min(...rthBars.map(b => b.l)));
     }
   }
 
@@ -200,10 +203,10 @@ async function fetchAndFill(symbol) {
     'month-low':      month.l,
     'week-high':      week.h,
     'week-low':       week.l,
-    'prevday-high':   prevDayBar ? round4(prevDayBar.h) : null,
-    'prevday-low':    prevDayBar ? round4(prevDayBar.l) : null,
+    'prevday-high':   prevRTHHigh  ?? (prevDayBar ? round4(prevDayBar.h) : null),
+    'prevday-low':    prevRTHLow   ?? (prevDayBar ? round4(prevDayBar.l) : null),
     'prevday-close':  null,   // must be entered manually — RTH close (4:15pm ET)
-    'prevday-open':   prevDayBar ? round4(prevDayBar.o) : null,
+    'prevday-open':   prevRTHOpen  ?? (prevDayBar ? round4(prevDayBar.o) : null),
     'overnight-high': overnight.h,
     'overnight-low':  overnight.l,
     'lateday-high':   lateday.h,
@@ -220,7 +223,7 @@ async function fetchAndFill(symbol) {
   }
 
   document.getElementById('auto-badge').classList.remove('hidden');
-  const rthNote = prevDayBar ? ` · prev day ${etDateStr(prevDayBar.t)}` : '';
+  const rthNote = prevRTHHigh ? ` · RTH ${etDateStr(prevDayBar.t)}` : (prevDayBar ? ` · Globex ${etDateStr(prevDayBar.t)}` : '');
   const onNote  = onBars.length === 0 ? ' · overnight unavailable' : '';
   setStatus('ok', `Filled ${filled} fields${rthNote}${onNote} · enter RTH close to get pivot`);
 }
