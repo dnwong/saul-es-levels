@@ -188,8 +188,8 @@ async function fetchAndFill(symbol) {
   const prevMidnight  = prevRTHBars.length ? etMidnightUTC(prevRTHBars[0].t) : todayMidnight - 86400000;
 
   const onBars = intraBars.filter(b => b.t > prevMidnight + RTH_END   && b.t <= todayMidnight + RTH_START);
-  // Late day: PREVIOUS trading day 3:30pm–4:15pm ET (Saul's pivot window)
-  const ldBars = intraBars.filter(b => b.t >= prevMidnight + 15.5*3600000 && b.t <= prevMidnight + 16.25*3600000);
+  // Late day: PREVIOUS trading day 4:00pm–4:15pm ET (Saul's pivot window)
+  const ldBars = intraBars.filter(b => b.t >= prevMidnight + 16*3600000 && b.t <= prevMidnight + 16.25*3600000);
 
   const overnight = rangeHL(onBars);
   const ldHL      = rangeHL(ldBars);
