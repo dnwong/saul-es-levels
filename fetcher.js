@@ -66,7 +66,7 @@ function bollingerBands(closes, period = 20, mult = 2) {
   return { upper: round4(mean + mult*sd), middle: round4(mean), lower: round4(mean - mult*sd) };
 }
 
-function round4(v) { return Math.round(v * 4) / 4; }
+function round4(v) { return Math.round(v); }
 
 // ─── Date range helpers ───────────────────────────────────────────────────────
 
@@ -188,9 +188,10 @@ async function fetchAndFill(symbol) {
   const prevMidnight  = prevRTHBars.length ? etMidnightUTC(prevRTHBars[0].t) : todayMidnight - 86400000;
 
   const onBars = intraBars.filter(b => b.t > prevMidnight + RTH_END   && b.t <= todayMidnight + RTH_START);
-  // Late day: single 4:40pm ET bar — Saul's pivot window
+  // Late day: 4:35pm–4:45pm ET (two 5-min bars after RTH close)
+  // Saul uses this post-market window with (H+L+C)/3 rounded to whole number
   const allLdBars = intraBars
-    .filter(b => b.t >= prevMidnight + 16.666*3600000 && b.t <= prevMidnight + 16.834*3600000)
+    .filter(b => b.t >= prevMidnight + 16.583*3600000 && b.t <= prevMidnight + 16.834*3600000)
     .sort((a, b) => a.t - b.t);
 
   const ldBars = allLdBars;

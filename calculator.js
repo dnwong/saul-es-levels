@@ -12,7 +12,7 @@ function v(id) {
 }
 
 function mid(h, l) {
-  return Math.round(((h + l) / 2) * 4) / 4; // round to nearest 0.25
+  return Math.round((h + l) / 2);
 }
 
 /**
@@ -20,21 +20,21 @@ function mid(h, l) {
  * Returns pivot + R1/R2/R3 + S1/S2/S3
  */
 function floorPivot(h, l, c, o = null) {
-  // Saul Shaoul floor pivot: uses late-day (2-4pm ET) H/L/C
-  // Formula: classic (H+L+C)/3 — no open weighting
-  const p = round4((h + l + c) / 3);
+  // Saul Shaoul floor pivot: uses late-day H/L/C with classic (H+L+C)/3
+  // Rounds to nearest whole number (not 0.25)
+  const p = Math.round((h + l + c) / 3);
 
-  const r1 = round4(2 * p - l);
-  const r2 = round4(p + (h - l));
-  const r3 = round4(h + 2 * (p - l));
-  const s1 = round4(2 * p - h);
-  const s2 = round4(p - (h - l));
-  const s3 = round4(l - 2 * (h - p));
+  const r1 = Math.round(2 * p - l);
+  const r2 = Math.round(p + (h - l));
+  const r3 = Math.round(h + 2 * (p - l));
+  const s1 = Math.round(2 * p - h);
+  const s2 = Math.round(p - (h - l));
+  const s3 = Math.round(l - 2 * (h - p));
 
   return { p, r1, r2, r3, s1, s2, s3 };
 }
 
-function round4(v) { return Math.round(v * 4) / 4; }
+function round4(v) { return Math.round(v); }
 
 // ─── Level builder ──────────────────────────────────────────────────────────
 
