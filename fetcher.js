@@ -179,9 +179,9 @@ async function fetchAndFill(symbol) {
       const off = b.t - midnight;
       return off >= RTH_START && off <= RTH_END;
     });
-    if (rth.length >= 20) { prevRTHBars = rth; prevSessionKey = dateKey; break; }
+    console.log(`  ${dateKey}: ${barsByDate[dateKey].length} total, ${rth.length} RTH bars`);
+    if (rth.length >= 5) { prevRTHBars = rth; prevSessionKey = dateKey; break; }
   }
-  console.log('Intraday dates available:', Object.keys(barsByDate).sort());
   console.log('Today ET:', todayETStr, '| Prev session:', prevSessionKey);
 
   const todayMidnight = etMidnightUTC(now.getTime());
