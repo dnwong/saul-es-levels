@@ -99,8 +99,7 @@ function buildRawLevels(data) {
     add(mid(data.overnightHigh, data.overnightLow), 'ON 50%', 'tag-50pct', 2);
   }
 
-  // ── Floor pivot from late-day session (2–4pm ET) ─────────────────────────
-  // Saul uses H/L/C from the 2-4pm afternoon session with classic (H+L+C)/3
+  // ── Floor pivot from late-day session (4:35-4:45pm ET) ───────────────────
   if (data.latedayHigh !== null && data.latedayLow !== null && data.latedayClose !== null) {
     const pv = floorPivot(data.latedayHigh, data.latedayLow, data.latedayClose);
     add(pv.p,  'Pivot', 'tag-pivot',   4);
@@ -229,13 +228,13 @@ function calculate() {
     return;
   }
 
-  // Anchor price: pivot if available, else midpoint of overnight, else prev close
+  // Anchor price: pivot if available
   const anchor = data._pivot
     ?? (data.overnightHigh && data.overnightLow ? mid(data.overnightHigh, data.overnightLow) : null)
     ?? data.prevdayClose;
 
-  // Filter: keep grid levels always, keep multi-TF levels only within ±150 pts of anchor
-  const RANGE = 150;
+  // Filter: keep pivot R/S levels always, keep multi-TF levels only within ±80 pts of anchor
+  const RANGE = 80;
   const filteredLevels = anchor !== null
     ? rawLevels.filter(l =>
         l.tagClass === 'tag-pivot' ||
