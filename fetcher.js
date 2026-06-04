@@ -188,8 +188,20 @@ async function fetchAndFill(symbol) {
   const prevMidnight  = prevRTHBars.length ? etMidnightUTC(prevRTHBars[0].t) : todayMidnight - 86400000;
 
   const onBars = intraBars.filter(b => b.t > prevMidnight + RTH_END   && b.t <= todayMidnight + RTH_START);
-  // Late day: PREVIOUS trading day 4:00pm–4:15pm ET (Saul's pivot window)
-  const ldBars = intraBars.filter(b => b.t >= prevMidnight + 16*3600000 && b.t <= prevMidnight + 16.25*3600000);
+  // Late day: use the single closing bar at 4:15pm ET (RTH close bar)
+  const allLdBars = intraBars
+    .filter(b => b.t >= prevMidnight + 15.5*3600000 && b.t <= prevMidnight + 16.5*3600000)
+    .sort((a, b) => a.t - b.t);
+
+  // Log all closing bars to find exact window
+  console.log('Closing bars (3:30-4:30pm ET):', allLdBars.map(b => {
+    const etH = new Date(toET(b.t)).getUTCHours();
+    const etM = new Date(toET(b.t)).getUTCMinutes();
+    return `${etH}:${String(etM).padStart(2,'0')} H:${b.h} L:${b.l} C:${b.c}`;
+  }));
+
+  // Use last 3 bars (≈15 min) ending at close
+  const ldBars = allLdBars.slice(-3);
 
   const overnight = rangeHL(onBars);
   const ldHL      = rangeHL(ldBars);
