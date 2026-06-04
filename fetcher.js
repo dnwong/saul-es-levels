@@ -188,10 +188,9 @@ async function fetchAndFill(symbol) {
   const prevMidnight  = prevRTHBars.length ? etMidnightUTC(prevRTHBars[0].t) : todayMidnight - 86400000;
 
   const onBars = intraBars.filter(b => b.t > prevMidnight + RTH_END   && b.t <= todayMidnight + RTH_START);
-  // Late day: PREVIOUS trading day 4:35pm–4:45pm ET
-  // Saul uses this post-market window for his floor pivot (H+L+C)/3
+  // Late day: single 4:40pm ET bar — Saul's pivot window
   const allLdBars = intraBars
-    .filter(b => b.t >= prevMidnight + 16.583*3600000 && b.t <= prevMidnight + 16.75*3600000)
+    .filter(b => b.t >= prevMidnight + 16.666*3600000 && b.t <= prevMidnight + 16.834*3600000)
     .sort((a, b) => a.t - b.t);
 
   const ldBars = allLdBars;
