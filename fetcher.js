@@ -181,11 +181,14 @@ async function fetchAndFill(symbol) {
     });
     if (rth.length >= 20) { prevRTHBars = rth; prevSessionKey = dateKey; break; }
   }
+  console.log('Intraday dates available:', Object.keys(barsByDate).sort());
+  console.log('Today ET:', todayETStr, '| Prev session:', prevSessionKey);
 
   const todayMidnight = etMidnightUTC(now.getTime());
   const prevMidnight  = prevRTHBars.length ? etMidnightUTC(prevRTHBars[0].t) : todayMidnight - 86400000;
 
   const onBars = intraBars.filter(b => b.t > prevMidnight + RTH_END   && b.t <= todayMidnight + RTH_START);
+  // Late day: PREVIOUS trading day 2:00pm–4:00pm ET (used for pivot)
   const ldBars = intraBars.filter(b => b.t >= prevMidnight + 14*3600000 && b.t <= prevMidnight + 16*3600000);
 
   const overnight = rangeHL(onBars);
