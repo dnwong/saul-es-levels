@@ -204,7 +204,6 @@ function calculate() {
     weekLow:      v('week-low'),
     prevdayHigh:  v('prevday-high'),
     prevdayLow:   v('prevday-low'),
-    prevdayClose: v('prevday-close'),
     prevdayOpen:  v('prevday-open'),
     overnightHigh: v('overnight-high'),
     overnightLow:  v('overnight-low'),

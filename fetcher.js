@@ -215,7 +215,6 @@ async function fetchAndFill(symbol) {
     'week-low':       week.l,
     'prevday-high':   prevRTHHigh  ?? (prevDayBar ? round4(prevDayBar.h) : null),
     'prevday-low':    prevRTHLow   ?? (prevDayBar ? round4(prevDayBar.l) : null),
-    'prevday-close':  null,   // must be entered manually — RTH close (4:15pm ET)
     'prevday-open':   prevRTHOpen  ?? (prevDayBar ? round4(prevDayBar.o) : null),
     'overnight-high': overnight.h,
     'overnight-low':  overnight.l,
