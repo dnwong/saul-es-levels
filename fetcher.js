@@ -189,7 +189,9 @@ async function fetchAndFill(symbol) {
   const ldBars = intraBars.filter(b => b.t >= prevMidnight + 14*3600000 && b.t <= prevMidnight + 16*3600000);
 
   const overnight = rangeHL(onBars);
-  const lateday   = rangeHL(ldBars);
+  const ldHL      = rangeHL(ldBars);
+  // Late-day close = last bar at or before 4pm ET
+  const ldClose   = ldBars.length ? round4(ldBars[ldBars.length - 1].c) : null;
 
   // ── Fill inputs ───────────────────────────────────────────────────────────
   const fields = {
@@ -209,8 +211,9 @@ async function fetchAndFill(symbol) {
     'prevday-open':   prevRTHOpen  ?? (prevDayBar ? round4(prevDayBar.o) : null),
     'overnight-high': overnight.h,
     'overnight-low':  overnight.l,
-    'lateday-high':   lateday.h,
-    'lateday-low':    lateday.l,
+    'lateday-high':   ldHL.h,
+    'lateday-low':    ldHL.l,
+    'lateday-close':  ldClose,
     'bb-upper':       bb ? bb.upper  : null,
     'bb-middle':      bb ? bb.middle : null,
     'bb-lower':       bb ? bb.lower  : null,

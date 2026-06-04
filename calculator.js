@@ -20,12 +20,9 @@ function mid(h, l) {
  * Returns pivot + R1/R2/R3 + S1/S2/S3
  */
 function floorPivot(h, l, c, o = null) {
-  // Shaoul's floor pivot: weights open double, rounds to nearest 0.25
-  // Formula: (H + L + C + 2×O) / 5  — falls back to (H+L+C)/3 if no open
-  const raw = o !== null
-    ? (h + l + c + 2 * o) / 5
-    : (h + l + c) / 3;
-  const p = round4(raw);
+  // Saul Shaoul floor pivot: uses late-day (2-4pm ET) H/L/C
+  // Formula: classic (H+L+C)/3 — no open weighting
+  const p = round4((h + l + c) / 3);
 
   const r1 = round4(2 * p - l);
   const r2 = round4(p + (h - l));
@@ -102,18 +99,18 @@ function buildRawLevels(data) {
     add(mid(data.overnightHigh, data.overnightLow), 'ON 50%', 'tag-50pct', 2);
   }
 
-  // ── Floor pivot + 6-point grid ───────────────────────────────────────────
-  if (data.prevdayHigh !== null && data.prevdayLow !== null && data.prevdayClose !== null) {
-    const pv = floorPivot(data.prevdayHigh, data.prevdayLow, data.prevdayClose, data.prevdayOpen);
-    add(pv.p, 'Pivot', 'tag-pivot', 4);
+  // ── Floor pivot from late-day session (2–4pm ET) ─────────────────────────
+  // Saul uses H/L/C from the 2-4pm afternoon session with classic (H+L+C)/3
+  if (data.latedayHigh !== null && data.latedayLow !== null && data.latedayClose !== null) {
+    const pv = floorPivot(data.latedayHigh, data.latedayLow, data.latedayClose);
+    add(pv.p,  'Pivot', 'tag-pivot',   4);
+    add(pv.r1, 'R1',    'tag-pivot-r', 3);
+    add(pv.r2, 'R2',    'tag-pivot-r', 3);
+    add(pv.r3, 'R3',    'tag-pivot-r', 2);
+    add(pv.s1, 'S1',    'tag-pivot-s', 3);
+    add(pv.s2, 'S2',    'tag-pivot-s', 3);
+    add(pv.s3, 'S3',    'tag-pivot-s', 2);
     data._pivot = pv.p;
-
-    // 6-point grid above and below pivot (10 levels each direction)
-    const STEP = 6;
-    for (let i = 1; i <= 10; i++) {
-      add(round4(pv.p + i * STEP), `+${i * STEP}`, 'tag-pivot-r', 2);
-      add(round4(pv.p - i * STEP), `-${i * STEP}`, 'tag-pivot-s', 2);
-    }
   }
 
   // ── Bollinger Bands ───────────────────────────────────────────────────────
@@ -214,6 +211,7 @@ function calculate() {
     overnightLow:  v('overnight-low'),
     latedayHigh:  v('lateday-high'),
     latedayLow:   v('lateday-low'),
+    latedayClose: v('lateday-close'),
     bbUpper:      v('bb-upper'),
     bbMiddle:     v('bb-middle'),
     bbLower:      v('bb-lower'),
@@ -296,64 +294,27 @@ function calculate() {
     var finalGroups = groups.slice(0, maxLevels).sort((a, b) => b.centerPrice - a.centerPrice);
   }
 
-  // ── Debug panel — always show what data was received ─────────────────────
+  // ── Debug panel ───────────────────────────────────────────────────────────
   const dbg = document.getElementById('debug-panel');
   dbg.classList.remove('hidden');
-
-  if (data.prevdayHigh !== null && data.prevdayLow !== null && data.prevdayClose !== null) {
-    const pv = floorPivot(data.prevdayHigh, data.prevdayLow, data.prevdayClose, data.prevdayOpen);
-    dbg.innerHTML = `
-      <strong>Prev Day:</strong>
-      H: ${data.prevdayHigh} &nbsp; L: ${data.prevdayLow} &nbsp; C: ${data.prevdayClose} &nbsp; O: ${data.prevdayOpen ?? '—'}
-      &nbsp;|&nbsp; <strong>Formula:</strong> ${data.prevdayOpen !== null ? '(H+L+C+O)/4' : '(H+L+C)/3'}
-      &nbsp;|&nbsp; <strong>Pivot:</strong> ${pv.p} &nbsp; R1:${pv.r1} R2:${pv.r2} R3:${pv.r3} &nbsp; S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}
-    `;
+  if (data.latedayHigh !== null && data.latedayLow !== null && data.latedayClose !== null) {
+    const pv = floorPivot(data.latedayHigh, data.latedayLow, data.latedayClose);
+    dbg.innerHTML = `<strong>Late Day (2–4pm ET):</strong> H:${data.latedayHigh} L:${data.latedayLow} C:${data.latedayClose} &nbsp;|&nbsp; <strong>Formula:</strong> (H+L+C)/3 &nbsp;|&nbsp; <strong>Pivot:</strong> ${pv.p} &nbsp; R1:${pv.r1} R2:${pv.r2} R3:${pv.r3} &nbsp; S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}`;
   } else {
-    dbg.innerHTML = `
-      <strong>Prev Day data missing:</strong>
-      H: ${data.prevdayHigh ?? '❌'} &nbsp;
-      L: ${data.prevdayLow  ?? '❌'} &nbsp;
-      C: ${data.prevdayClose ?? '❌'} &nbsp;
-      O: ${data.prevdayOpen  ?? '❌'}
-      — check that Fetch Live Data completed successfully.
-    `;
+    dbg.innerHTML = `<strong>Late Day data missing</strong> — fetch live data or enter Late Day H/L/C manually.`;
   }
+
+  // ── Pivot badge & bias bar ────────────────────────────────────────────────
   const pivotBadge = document.getElementById('pivot-badge');
   const biasBar = document.getElementById('bias-bar');
   const biasText = document.getElementById('bias-text');
 
   if (data._pivot !== null) {
-    // Show full pivot suite in badge
-    const pv = floorPivot(data.prevdayHigh, data.prevdayLow, data.prevdayClose, data.prevdayOpen);
-    pivotBadge.textContent = `Pivot: ${pv.p.toFixed(2)}  Grid: ±6 pts`;
+    pivotBadge.textContent = `Pivot: ${data._pivot.toFixed(2)}`;
     pivotBadge.classList.remove('hidden');
 
-    // Debug: show what prev day data was used
-    console.log('Prev Day → H:', data.prevdayHigh, 'L:', data.prevdayLow, 'C:', data.prevdayClose, 'O:', data.prevdayOpen);
-    console.log('Pivot suite:', pv);
-
-    // Show debug panel
-    const dbg = document.getElementById('debug-panel');
-    dbg.classList.remove('hidden');
-    dbg.innerHTML = `
-      <strong>Prev Day used for pivot:</strong>
-      H: ${data.prevdayHigh ?? '—'} &nbsp;
-      L: ${data.prevdayLow  ?? '—'} &nbsp;
-      C: ${data.prevdayClose ?? '—'} &nbsp;
-      O: ${data.prevdayOpen  ?? '—'}
-      &nbsp;|&nbsp;
-      <strong>Formula:</strong> ${data.prevdayOpen !== null ? '(H+L+C+2O)/5' : '(H+L+C)/3'}
-      &nbsp;|&nbsp;
-      <strong>Pivot:</strong> ${pv.p} &nbsp;
-      R1:${pv.r1} R2:${pv.r2} R3:${pv.r3} &nbsp;
-      S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}
-    `;
-
-    // Bias: use overnight close (overnight low as proxy if no close available)
     const lastPrice = data.overnightHigh !== null && data.overnightLow !== null
-      ? mid(data.overnightHigh, data.overnightLow)
-      : null;
-
+      ? mid(data.overnightHigh, data.overnightLow) : null;
     if (lastPrice !== null) {
       biasBar.classList.remove('hidden', 'bullish', 'bearish', 'neutral');
       if (lastPrice > data._pivot + window) {
@@ -469,24 +430,23 @@ document.querySelectorAll('.input-row input').forEach(el => {
 
 // ── Live pivot preview as user types the RTH close ────────────────────────
 function updatePivotPreview() {
-  const h = v('prevday-high');
-  const l = v('prevday-low');
-  const c = v('prevday-close');
-  const o = v('prevday-open');
+  const h = v('lateday-high');
+  const l = v('lateday-low');
+  const c = v('lateday-close');
   const preview = document.getElementById('pivot-preview');
   if (!preview) return;
 
   if (h && l && c) {
-    const pv = floorPivot(h, l, c, o);
+    const pv = floorPivot(h, l, c);
     preview.classList.remove('hidden');
     preview.innerHTML = `Pivot → <strong>${pv.p.toFixed(2)}</strong>` +
-      `&nbsp; +6:${(pv.p+6).toFixed(2)} +12:${(pv.p+12).toFixed(2)}` +
-      `&nbsp; -6:${(pv.p-6).toFixed(2)} -12:${(pv.p-12).toFixed(2)}`;
+      `&nbsp; R1:${pv.r1} R2:${pv.r2} R3:${pv.r3}` +
+      `&nbsp; S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}`;
   } else {
     preview.classList.add('hidden');
   }
 }
 
-['prevday-high','prevday-low','prevday-close','prevday-open'].forEach(id => {
+['lateday-high','lateday-low','lateday-close'].forEach(id => {
   document.getElementById(id).addEventListener('input', updatePivotPreview);
 });
