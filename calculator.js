@@ -19,10 +19,9 @@ function mid(h, l) {
  * Floor pivot calculation (classic floor trader formula).
  * Returns pivot + R1/R2/R3 + S1/S2/S3
  */
-function floorPivot(h, l, c, o = null) {
-  // Saul Shaoul floor pivot: uses late-day H/L/C with classic (H+L+C)/3
-  // Rounds to nearest whole number (not 0.25)
-  const p = Math.round((h + l + c) / 3);
+function floorPivot(h, l, c, o = null, preCalcP = null) {
+  // If pivot is pre-calculated, use it directly
+  const p = preCalcP !== null ? preCalcP : Math.round((h + l + c) / 3);
 
   const r1 = Math.round(2 * p - l);
   const r2 = Math.round(p + (h - l));
@@ -99,8 +98,23 @@ function buildRawLevels(data) {
     add(mid(data.overnightHigh, data.overnightLow), 'ON 50%', 'tag-50pct', 2);
   }
 
-  // ── Floor pivot from late-day session (4:35-4:45pm ET) ───────────────────
-  if (data.latedayHigh !== null && data.latedayLow !== null && data.latedayClose !== null) {
+  // ── Floor pivot ───────────────────────────────────────────────────────────
+  // Use directly entered pivot if provided, otherwise calculate from late-day bars
+  const directPivot = data.floorPivot;
+  if (directPivot !== null) {
+    // Use entered pivot directly with late-day H/L for R/S levels
+    const h = data.latedayHigh ?? (directPivot + 10);
+    const l = data.latedayLow  ?? (directPivot - 10);
+    const pv = floorPivot(h, l, null, null, directPivot);
+    add(pv.p,  'Pivot', 'tag-pivot',   4);
+    add(pv.r1, 'R1',    'tag-pivot-r', 3);
+    add(pv.r2, 'R2',    'tag-pivot-r', 3);
+    add(pv.r3, 'R3',    'tag-pivot-r', 2);
+    add(pv.s1, 'S1',    'tag-pivot-s', 3);
+    add(pv.s2, 'S2',    'tag-pivot-s', 3);
+    add(pv.s3, 'S3',    'tag-pivot-s', 2);
+    data._pivot = pv.p;
+  } else if (data.latedayHigh !== null && data.latedayLow !== null && data.latedayClose !== null) {
     const pv = floorPivot(data.latedayHigh, data.latedayLow, data.latedayClose);
     add(pv.p,  'Pivot', 'tag-pivot',   4);
     add(pv.r1, 'R1',    'tag-pivot-r', 3);
@@ -210,6 +224,7 @@ function calculate() {
     latedayHigh:  v('lateday-high'),
     latedayLow:   v('lateday-low'),
     latedayClose: v('lateday-close'),
+    floorPivot:   v('floor-pivot'),
     bbUpper:      v('bb-upper'),
     bbMiddle:     v('bb-middle'),
     bbLower:      v('bb-lower'),

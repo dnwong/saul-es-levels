@@ -199,6 +199,15 @@ async function fetchAndFill(symbol) {
     .filter(b => b.t >= ldMidnight + 16.583*3600000 && b.t <= ldMidnight + 16.834*3600000)
     .sort((a, b) => a.t - b.t);
 
+  // Log closing bars for debugging
+  const debugBars = intraBars
+    .filter(b => b.t >= ldMidnight + 15.5*3600000 && b.t <= ldMidnight + 18*3600000)
+    .sort((a, b) => a.t - b.t);
+  console.log('Prev session closing bars (3:30-6pm ET):', debugBars.map(b => {
+    const d = new Date(toET(b.t));
+    return `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2,'0')} H:${b.h} L:${b.l} C:${b.c}`;
+  }));
+
   const ldBars = allLdBars;
 
   const overnight = rangeHL(onBars);
