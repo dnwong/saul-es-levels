@@ -19,17 +19,14 @@ function mid(h, l) {
  * Floor pivot calculation (classic floor trader formula).
  * Returns pivot + R1/R2/R3 + S1/S2/S3
  */
-function floorPivot(h, l, c, o = null, preCalcP = null) {
-  // If pivot is pre-calculated, use it directly
-  const p = preCalcP !== null ? preCalcP : Math.round((h + l + c) / 3);
-
+function floorPivot(h, l, c) {
+  const p = Math.round((h + l + c) / 3);
   const r1 = Math.round(2 * p - l);
   const r2 = Math.round(p + (h - l));
   const r3 = Math.round(h + 2 * (p - l));
   const s1 = Math.round(2 * p - h);
   const s2 = Math.round(p - (h - l));
   const s3 = Math.round(l - 2 * (h - p));
-
   return { p, r1, r2, r3, s1, s2, s3 };
 }
 
@@ -98,23 +95,8 @@ function buildRawLevels(data) {
     add(mid(data.overnightHigh, data.overnightLow), 'ON 50%', 'tag-50pct', 2);
   }
 
-  // ── Floor pivot ───────────────────────────────────────────────────────────
-  // Use directly entered pivot if provided, otherwise calculate from late-day bars
-  const directPivot = data.floorPivot;
-  if (directPivot !== null) {
-    // Use entered pivot directly with late-day H/L for R/S levels
-    const h = data.latedayHigh ?? (directPivot + 10);
-    const l = data.latedayLow  ?? (directPivot - 10);
-    const pv = floorPivot(h, l, null, null, directPivot);
-    add(pv.p,  'Pivot', 'tag-pivot',   4);
-    add(pv.r1, 'R1',    'tag-pivot-r', 3);
-    add(pv.r2, 'R2',    'tag-pivot-r', 3);
-    add(pv.r3, 'R3',    'tag-pivot-r', 2);
-    add(pv.s1, 'S1',    'tag-pivot-s', 3);
-    add(pv.s2, 'S2',    'tag-pivot-s', 3);
-    add(pv.s3, 'S3',    'tag-pivot-s', 2);
-    data._pivot = pv.p;
-  } else if (data.latedayHigh !== null && data.latedayLow !== null && data.latedayClose !== null) {
+  // ── Floor pivot from late-day session (4:35-4:45pm ET) ───────────────────
+  if (data.latedayHigh !== null && data.latedayLow !== null && data.latedayClose !== null) {
     const pv = floorPivot(data.latedayHigh, data.latedayLow, data.latedayClose);
     add(pv.p,  'Pivot', 'tag-pivot',   4);
     add(pv.r1, 'R1',    'tag-pivot-r', 3);
@@ -224,7 +206,6 @@ function calculate() {
     latedayHigh:  v('lateday-high'),
     latedayLow:   v('lateday-low'),
     latedayClose: v('lateday-close'),
-    floorPivot:   v('floor-pivot'),
     bbUpper:      v('bb-upper'),
     bbMiddle:     v('bb-middle'),
     bbLower:      v('bb-lower'),
@@ -437,25 +418,20 @@ document.querySelectorAll('.input-row input').forEach(el => {
 
 // ── Live pivot preview as user types the RTH close ────────────────────────
 function updatePivotPreview() {
-  const p = v('floor-pivot');
   const h = v('lateday-high');
   const l = v('lateday-low');
+  const c = v('lateday-close');
   const preview = document.getElementById('pivot-preview');
   if (!preview) return;
-
-  if (p) {
-    const hh = h ?? (p + 10);
-    const ll = l ?? (p - 10);
-    const pv = floorPivot(hh, ll, null, null, p);
+  if (h && l && c) {
+    const pv = floorPivot(h, l, c);
     preview.classList.remove('hidden');
-    preview.innerHTML = `Pivot: <strong>${p}</strong>` +
-      `&nbsp; R1:${pv.r1} R2:${pv.r2} R3:${pv.r3}` +
-      `&nbsp; S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}`;
+    preview.innerHTML = `Pivot → <strong>${pv.p}</strong> &nbsp; R1:${pv.r1} R2:${pv.r2} R3:${pv.r3} &nbsp; S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}`;
   } else {
     preview.classList.add('hidden');
   }
 }
 
-['floor-pivot','lateday-high','lateday-low'].forEach(id => {
+['lateday-high','lateday-low','lateday-close'].forEach(id => {
   document.getElementById(id)?.addEventListener('input', updatePivotPreview);
 });
