@@ -92,12 +92,13 @@
         </div>
 
         <div class="tf-group">
-          <h3>Floor Pivot <span class="tf-note">enter from Saul's levels</span></h3>
+          <h3>Floor Pivot <span class="tf-note">enter from Saul's morning post</span></h3>
           <div class="input-row">
-            <label>Pivot <input type="number" id="floor-pivot" step="1" placeholder="e.g. 7548" /></label>
-            <label>H (late day) <input type="number" id="lateday-high" step="1" /></label>
-            <label>L (late day) <input type="number" id="lateday-low"  step="1" /></label>
-            <label>C (late day) <input type="number" id="lateday-close" step="1" /></label>
+            <label class="close-label">Pivot <span class="close-hint">required</span>
+              <input type="number" id="floor-pivot" step="1" placeholder="e.g. 7548" class="close-input" />
+            </label>
+            <label>Late Day H <input type="number" id="lateday-high" step="1" /></label>
+            <label>Late Day L <input type="number" id="lateday-low"  step="1" /></label>
           </div>
           <div id="pivot-preview" class="pivot-preview hidden"></div>
         </div>

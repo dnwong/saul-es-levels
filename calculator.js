@@ -245,7 +245,7 @@ function calculate() {
   // Anchor price: pivot if available
   const anchor = data._pivot
     ?? (data.overnightHigh && data.overnightLow ? mid(data.overnightHigh, data.overnightLow) : null)
-    ?? data.prevdayClose;
+    ?? data.prevdayLow;
 
   // Filter: keep pivot R/S levels always, keep multi-TF levels only within ±80 pts of anchor
   const RANGE = 80;
@@ -261,60 +261,53 @@ function calculate() {
   const groups = mergeConfluences(filteredLevels, window);
   const maxWeight = groups[0]?.totalWeight || 1;
 
-  // Ensure there is exactly one pivot group — merge any duplicates
+  // Ensure exactly one pivot group
   const pivotGroups = groups.filter(g => isPivot(g.members));
   if (pivotGroups.length > 1) {
-    // Keep the first, merge others into it
     const primary = pivotGroups[0];
     for (let i = 1; i < pivotGroups.length; i++) {
       primary.members.push(...pivotGroups[i].members);
       primary.totalWeight += pivotGroups[i].totalWeight;
-      // Remove the duplicate from groups
       const idx = groups.indexOf(pivotGroups[i]);
       if (idx > -1) groups.splice(idx, 1);
     }
     const totalW = primary.members.reduce((s, m) => s + m.weight, 0);
-    primary.centerPrice = round4(
-      primary.members.reduce((s, m) => s + m.price * m.weight, 0) / totalW
-    );
+    primary.centerPrice = Math.round(primary.members.reduce((s, m) => s + m.price * m.weight, 0) / totalW);
   }
 
-  // Split into above/at/below pivot groups
   const pivotPrice = data._pivot;
-  let aboveGroups, pivotGroup, belowGroups;
+  let finalGroups;
 
   if (pivotPrice !== null) {
-    pivotGroup = groups.find(g => isPivot(g.members));
-
-    // Force pivot group centerPrice to exact pivot value
+    const pivotGroup = groups.find(g => isPivot(g.members));
     if (pivotGroup) pivotGroup.centerPrice = pivotPrice;
 
-    aboveGroups = groups.filter(g => g !== pivotGroup && g.centerPrice > pivotPrice)
-                        .sort((a, b) => a.centerPrice - b.centerPrice);
-    belowGroups = groups.filter(g => g !== pivotGroup && g.centerPrice < pivotPrice)
-                        .sort((a, b) => b.centerPrice - a.centerPrice);
+    const aboveGroups = groups.filter(g => g !== pivotGroup && g.centerPrice > pivotPrice)
+                              .sort((a, b) => a.centerPrice - b.centerPrice);
+    const belowGroups = groups.filter(g => g !== pivotGroup && g.centerPrice < pivotPrice)
+                              .sort((a, b) => b.centerPrice - a.centerPrice);
 
     const half = Math.floor((maxLevels - 1) / 2);
-    aboveGroups = aboveGroups.slice(-half).reverse();
-    belowGroups = belowGroups.slice(0, half);
+    const above = aboveGroups.slice(-half).reverse();
+    const below = belowGroups.slice(0, half);
 
-    let topGroups = [...aboveGroups];
-    if (pivotGroup) topGroups.push(pivotGroup);
-    topGroups = topGroups.concat(belowGroups);
-    var finalGroups = topGroups;
+    finalGroups = [...above];
+    if (pivotGroup) finalGroups.push(pivotGroup);
+    finalGroups = finalGroups.concat(below);
   } else {
-    // No pivot — just take top N by weight, sort high→low
-    var finalGroups = groups.slice(0, maxLevels).sort((a, b) => b.centerPrice - a.centerPrice);
+    finalGroups = groups.slice(0, maxLevels).sort((a, b) => b.centerPrice - a.centerPrice);
   }
 
   // ── Debug panel ───────────────────────────────────────────────────────────
   const dbg = document.getElementById('debug-panel');
   dbg.classList.remove('hidden');
-  if (data.latedayHigh !== null && data.latedayLow !== null && data.latedayClose !== null) {
+  if (data.floorPivot !== null) {
+    dbg.innerHTML = `<strong>Pivot:</strong> ${data.floorPivot} (manually entered) &nbsp;|&nbsp; Late Day H:${data.latedayHigh ?? '—'} L:${data.latedayLow ?? '—'}`;
+  } else if (data.latedayHigh !== null && data.latedayLow !== null && data.latedayClose !== null) {
     const pv = floorPivot(data.latedayHigh, data.latedayLow, data.latedayClose);
-    dbg.innerHTML = `<strong>Late Day (2–4pm ET):</strong> H:${data.latedayHigh} L:${data.latedayLow} C:${data.latedayClose} &nbsp;|&nbsp; <strong>Formula:</strong> (H+L+C)/3 &nbsp;|&nbsp; <strong>Pivot:</strong> ${pv.p} &nbsp; R1:${pv.r1} R2:${pv.r2} R3:${pv.r3} &nbsp; S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}`;
+    dbg.innerHTML = `<strong>Auto Pivot:</strong> ${pv.p} from late-day H:${data.latedayHigh} L:${data.latedayLow} C:${data.latedayClose}`;
   } else {
-    dbg.innerHTML = `<strong>Late Day data missing</strong> — fetch live data or enter Late Day H/L/C manually.`;
+    dbg.innerHTML = `<strong>Enter pivot</strong> in Floor Pivot field above.`;
   }
 
   // ── Pivot badge & bias bar ────────────────────────────────────────────────
@@ -323,7 +316,7 @@ function calculate() {
   const biasText = document.getElementById('bias-text');
 
   if (data._pivot !== null) {
-    pivotBadge.textContent = `Pivot: ${data._pivot.toFixed(2)}`;
+    pivotBadge.textContent = `Pivot: ${data._pivot}`;
     pivotBadge.classList.remove('hidden');
 
     const lastPrice = data.overnightHigh !== null && data.overnightLow !== null
@@ -369,7 +362,7 @@ function calculate() {
     tableHTML += `
       <tr>
         <td style="color:var(--muted);font-size:12px">${i + 1}</td>
-        <td><span class="${priceClass}">${g.centerPrice.toFixed(2)}</span></td>
+        <td><span class="${priceClass}">${g.centerPrice}</span></td>
         <td>${scoreDotsHTML(g.totalWeight, maxWeight)}</td>
         <td><div class="tags">${tags}</div></td>
       </tr>
@@ -379,7 +372,7 @@ function calculate() {
   tableHTML += '</tbody></table>';
   document.getElementById('levels-table-wrap').innerHTML = tableHTML;
 
-  // ── Confluence zones (multi-source only) ──────────────────────────────────
+  // ── Confluence zones ──────────────────────────────────────────────────────
   const multiGroups = groups.filter(g => g.members.length > 1);
   const confSection = document.getElementById('confluence-section');
   const confList = document.getElementById('confluence-list');
@@ -389,7 +382,7 @@ function calculate() {
     confList.innerHTML = multiGroups.slice(0, 10).map(g => {
       const tags = g.members.map(m => tagHTML(m.label, m.tagClass)).join('');
       return `<div class="confluence-zone">
-        <span class="zone-price">${g.centerPrice.toFixed(2)}</span>
+        <span class="zone-price">${g.centerPrice}</span>
         <span class="zone-count">${g.members.length} sources</span>
         <div class="tags">${tags}</div>
       </div>`;
@@ -407,12 +400,13 @@ function calculate() {
   rawList.innerHTML = `<div class="raw-grid">` +
     sortedRaw.map(l => `
       <div class="raw-item">
-        <span class="raw-item-price">${l.price.toFixed(2)}</span>
+        <span class="raw-item-price">${l.price}</span>
         <span class="raw-item-label">${l.label}</span>
       </div>
     `).join('') +
     `</div>`;
 }
+
 
 
 function clearAll() {
@@ -443,16 +437,18 @@ document.querySelectorAll('.input-row input').forEach(el => {
 
 // ── Live pivot preview as user types the RTH close ────────────────────────
 function updatePivotPreview() {
+  const p = v('floor-pivot');
   const h = v('lateday-high');
   const l = v('lateday-low');
-  const c = v('lateday-close');
   const preview = document.getElementById('pivot-preview');
   if (!preview) return;
 
-  if (h && l && c) {
-    const pv = floorPivot(h, l, c);
+  if (p) {
+    const hh = h ?? (p + 10);
+    const ll = l ?? (p - 10);
+    const pv = floorPivot(hh, ll, null, null, p);
     preview.classList.remove('hidden');
-    preview.innerHTML = `Pivot → <strong>${pv.p.toFixed(2)}</strong>` +
+    preview.innerHTML = `Pivot: <strong>${p}</strong>` +
       `&nbsp; R1:${pv.r1} R2:${pv.r2} R3:${pv.r3}` +
       `&nbsp; S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}`;
   } else {
@@ -460,6 +456,6 @@ function updatePivotPreview() {
   }
 }
 
-['lateday-high','lateday-low','lateday-close'].forEach(id => {
-  document.getElementById(id).addEventListener('input', updatePivotPreview);
+['floor-pivot','lateday-high','lateday-low'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', updatePivotPreview);
 });
