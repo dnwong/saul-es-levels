@@ -187,11 +187,16 @@ async function fetchAndFill(symbol) {
   const todayMidnight = etMidnightUTC(now.getTime());
   const prevMidnight  = prevRTHBars.length ? etMidnightUTC(prevRTHBars[0].t) : todayMidnight - 86400000;
 
+  // Late day: 4:35-4:45pm ET of the PREVIOUS completed session
+  // Guard: if prevSessionKey somehow equals today, use two days ago
+  const ldMidnight = prevSessionKey && prevSessionKey < todayETStr
+    ? etMidnightUTC(prevRTHBars[0].t)
+    : todayMidnight - 2 * 86400000;
+
   const onBars = intraBars.filter(b => b.t > prevMidnight + RTH_END   && b.t <= todayMidnight + RTH_START);
-  // Late day: 4:35pm–4:45pm ET (two 5-min bars after RTH close)
-  // Saul uses this post-market window with (H+L+C)/3 rounded to whole number
+  // Late day: 4:35pm–4:45pm ET of the PREVIOUS completed session
   const allLdBars = intraBars
-    .filter(b => b.t >= prevMidnight + 16.583*3600000 && b.t <= prevMidnight + 16.834*3600000)
+    .filter(b => b.t >= ldMidnight + 16.583*3600000 && b.t <= ldMidnight + 16.834*3600000)
     .sort((a, b) => a.t - b.t);
 
   const ldBars = allLdBars;
