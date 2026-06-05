@@ -228,8 +228,8 @@ function calculate() {
     ?? (data.overnightHigh && data.overnightLow ? mid(data.overnightHigh, data.overnightLow) : null)
     ?? data.prevdayLow;
 
-  // Filter: keep pivot R/S levels always, keep multi-TF levels only within ±80 pts of anchor
-  const RANGE = 80;
+  // Filter: keep pivot R/S levels always, keep multi-TF levels only within ±60 pts of anchor
+  const RANGE = 60;
   const filteredLevels = anchor !== null
     ? rawLevels.filter(l =>
         l.tagClass === 'tag-pivot' ||
