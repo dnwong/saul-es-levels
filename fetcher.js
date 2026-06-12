@@ -98,7 +98,6 @@ async function fetchData() {
   }
 
   // ── TwelveData: daily bars for pivot H/L/C (RTH-only) ────────────────────
-  // ES/USD is TwelveData's symbol for E-mini S&P 500 futures
   try {
     const tdSym = sym === 'ES=F' ? 'ES/USD' : sym;
     const res = await fetch(`/td?symbol=${encodeURIComponent(tdSym)}&interval=1day&outputsize=5&order=desc`);

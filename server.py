@@ -89,9 +89,14 @@ class Handler(SimpleHTTPRequestHandler):
                 with urllib.request.urlopen(req, timeout=15) as resp:
                     raw = resp.read()
                 data = json.loads(raw)
-                print(f"[td] {params.get('symbol',['?'])[0]} {params.get('interval',['?'])[0]} status={data.get('status','?')}")
+                print(f"[td] {params.get('symbol',['?'])[0]} status={data.get('status','?')} code={data.get('code','')}")
                 self._respond(200, data)
+            except urllib.error.HTTPError as e:
+                body = e.read().decode()
+                print(f"[td] HTTP error {e.code}: {body[:200]}")
+                self._respond(e.code, {"error": str(e), "detail": body[:500]})
             except Exception as e:
+                print(f"[td] Error: {e}")
                 self._respond(500, {"error": str(e)})
             return
 
