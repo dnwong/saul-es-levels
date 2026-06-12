@@ -1,437 +1,222 @@
 /**
- * Saul Shaoul ES Key Levels Calculator
- * Methodology: multi-timeframe H/L, 50% midpoints, confluence scoring,
- * floor pivot, overnight/late-day extremes, Bollinger Bands
+ * calculator.js — Saul Shaoul ES Key Levels
+ * Pivot: (H+L+C)/3 from user-entered broker data
+ * Multi-TF: year/quarter/month/week H·L + 50% midpoints + overnight
+ * All levels rounded to whole numbers
  */
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function v(id) {
-  const val = parseFloat(document.getElementById(id).value);
-  return isNaN(val) ? null : val;
+function g(id) {
+  const v = parseFloat(document.getElementById(id)?.value);
+  return isNaN(v) ? null : Math.round(v);
 }
 
-function mid(h, l) {
-  return Math.round((h + l) / 2);
-}
+function mid(h, l) { return Math.round((h + l) / 2); }
 
-/**
- * Floor pivot calculation (classic floor trader formula).
- * Returns pivot + R1/R2/R3 + S1/S2/S3
- */
-function floorPivot(h, l, c) {
-  const p = Math.round((h + l + c) / 3);
-  const r1 = Math.round(2 * p - l);
+// ─── Floor pivot ─────────────────────────────────────────────────────────────
+
+function pivot(h, l, c) {
+  const p  = Math.round((h + l + c) / 3);
+  const r1 = Math.round(2*p - l);
   const r2 = Math.round(p + (h - l));
-  const r3 = Math.round(h + 2 * (p - l));
-  const s1 = Math.round(2 * p - h);
+  const r3 = Math.round(h + 2*(p - l));
+  const s1 = Math.round(2*p - h);
   const s2 = Math.round(p - (h - l));
-  const s3 = Math.round(l - 2 * (h - p));
+  const s3 = Math.round(l - 2*(h - p));
   return { p, r1, r2, r3, s1, s2, s3 };
 }
 
-function round4(v) { return Math.round(v); }
+// ─── Live pivot preview ───────────────────────────────────────────────────────
 
-// ─── Level builder ──────────────────────────────────────────────────────────
+function updatePreview() {
+  const h = g('pivot-h'), l = g('pivot-l'), c = g('pivot-c');
+  const el = document.getElementById('pivot-preview');
+  if (h !== null && l !== null && c !== null) {
+    const pv = pivot(h, l, c);
+    el.innerHTML = `<strong>${pv.p}</strong> &nbsp; R1:${pv.r1} R2:${pv.r2} R3:${pv.r3} &nbsp; S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}`;
+  } else {
+    el.innerHTML = '';
+  }
+}
 
-/**
- * Each level: { price, sources: [string], weight: number }
- * weight = sum of source weights (used for confluence scoring)
- */
-function buildRawLevels(data) {
+['pivot-h','pivot-l','pivot-c'].forEach(id =>
+  document.getElementById(id)?.addEventListener('input', updatePreview)
+);
+
+// ─── Build raw levels ─────────────────────────────────────────────────────────
+
+function buildLevels(d) {
   const levels = [];
 
-  function add(price, label, tagClass, weight = 1) {
-    if (price === null || price === undefined || isNaN(price)) return;
-    levels.push({ price, label, tagClass, weight });
+  function add(price, label, tag, weight) {
+    if (price == null || isNaN(price)) return;
+    levels.push({ price: Math.round(price), label, tag, weight });
   }
 
-  // ── Multi-timeframe highs / lows ──────────────────────────────────────────
-  const tfs = [
-    { key: 'life',     label: 'Life High',     tagClass: 'tag-life',    weight: 5 },
-    { key: 'life',     label: 'Life Low',      tagClass: 'tag-life',    weight: 5, isLow: true },
-    { key: 'year',     label: 'Year High',     tagClass: 'tag-year',    weight: 4 },
-    { key: 'year',     label: 'Year Low',      tagClass: 'tag-year',    weight: 4, isLow: true },
-    { key: 'quarter',  label: 'Qtr High',      tagClass: 'tag-quarter', weight: 3 },
-    { key: 'quarter',  label: 'Qtr Low',       tagClass: 'tag-quarter', weight: 3, isLow: true },
-    { key: 'month',    label: 'Month High',    tagClass: 'tag-month',   weight: 3 },
-    { key: 'month',    label: 'Month Low',     tagClass: 'tag-month',   weight: 3, isLow: true },
-    { key: 'week',     label: 'Week High',     tagClass: 'tag-week',    weight: 2 },
-    { key: 'week',     label: 'Week Low',      tagClass: 'tag-week',    weight: 2, isLow: true },
-    { key: 'prevday',  label: 'Prev Day High', tagClass: 'tag-prevday', weight: 2 },
-    { key: 'prevday',  label: 'Prev Day Low',  tagClass: 'tag-prevday', weight: 2, isLow: true },
-  ];
+  // Multi-timeframe H/L
+  add(d.yearH,    'Year High',    'tag-year',  4); add(d.yearL,    'Year Low',    'tag-year',  4);
+  add(d.qtrH,     'Qtr High',     'tag-qtr',   3); add(d.qtrL,     'Qtr Low',     'tag-qtr',   3);
+  add(d.monthH,   'Month High',   'tag-month', 3); add(d.monthL,   'Month Low',   'tag-month', 3);
+  add(d.weekH,    'Week High',    'tag-week',  2); add(d.weekL,    'Week Low',    'tag-week',  2);
+  add(d.pdH,      'Prev Day High','tag-pd',    2); add(d.pdL,      'Prev Day Low','tag-pd',    2);
 
-  for (const tf of tfs) {
-    const price = tf.isLow ? data[tf.key + 'Low'] : data[tf.key + 'High'];
-    add(price, tf.label, tf.tagClass, tf.weight);
+  // Overnight
+  add(d.onH, 'ON High', 'tag-on', 2); add(d.onL, 'ON Low', 'tag-on', 2);
+
+  // 50% midpoints
+  if (d.yearH  && d.yearL)  add(mid(d.yearH,  d.yearL),  'Year 50%',  'tag-50', 4);
+  if (d.qtrH   && d.qtrL)   add(mid(d.qtrH,   d.qtrL),   'Qtr 50%',   'tag-50', 3);
+  if (d.monthH && d.monthL) add(mid(d.monthH, d.monthL), 'Month 50%', 'tag-50', 3);
+  if (d.weekH  && d.weekL)  add(mid(d.weekH,  d.weekL),  'Week 50%',  'tag-50', 2);
+  if (d.pdH    && d.pdL)    add(mid(d.pdH,    d.pdL),    'PrevDay 50%','tag-50', 2);
+  if (d.onH    && d.onL)    add(mid(d.onH,    d.onL),    'ON 50%',    'tag-50', 2);
+
+  // Pivot R/S levels
+  if (d.pvH !== null && d.pvL !== null && d.pvC !== null) {
+    const pv = pivot(d.pvH, d.pvL, d.pvC);
+    add(pv.p,  'Pivot', 'tag-pivot', 5);
+    add(pv.r1, 'R1',    'tag-r',     3); add(pv.r2, 'R2', 'tag-r', 3); add(pv.r3, 'R3', 'tag-r', 2);
+    add(pv.s1, 'S1',    'tag-s',     3); add(pv.s2, 'S2', 'tag-s', 3); add(pv.s3, 'S3', 'tag-s', 2);
+    d._pivot = pv.p;
   }
-
-  // ── 50% midpoints ─────────────────────────────────────────────────────────
-  const midRanges = [
-    { hKey: 'lifeHigh',    lKey: 'lifeLow',    label: 'Life 50%',    tagClass: 'tag-50pct', weight: 5 },
-    { hKey: 'yearHigh',    lKey: 'yearLow',    label: 'Year 50%',    tagClass: 'tag-50pct', weight: 4 },
-    { hKey: 'quarterHigh', lKey: 'quarterLow', label: 'Qtr 50%',     tagClass: 'tag-50pct', weight: 3 },
-    { hKey: 'monthHigh',   lKey: 'monthLow',   label: 'Month 50%',   tagClass: 'tag-50pct', weight: 3 },
-    { hKey: 'weekHigh',    lKey: 'weekLow',    label: 'Week 50%',    tagClass: 'tag-50pct', weight: 2 },
-    { hKey: 'prevdayHigh', lKey: 'prevdayLow', label: 'PrevDay 50%', tagClass: 'tag-50pct', weight: 2 },
-  ];
-
-  for (const r of midRanges) {
-    const h = data[r.hKey], l = data[r.lKey];
-    if (h !== null && l !== null) {
-      add(mid(h, l), r.label, r.tagClass, r.weight);
-    }
-  }
-
-  // ── Overnight / late-day extremes ─────────────────────────────────────────
-  add(data.overnightHigh, 'ON High',       'tag-overnight', 2);
-  add(data.overnightLow,  'ON Low',        'tag-overnight', 2);
-  add(data.latedayHigh,   'Late Day High', 'tag-lateday',   1);
-  add(data.latedayLow,    'Late Day Low',  'tag-lateday',   1);
-
-  // Overnight 50%
-  if (data.overnightHigh !== null && data.overnightLow !== null) {
-    add(mid(data.overnightHigh, data.overnightLow), 'ON 50%', 'tag-50pct', 2);
-  }
-
-  // ── Floor pivot from late-day session (4:35-4:45pm ET) ───────────────────
-  if (data.latedayHigh !== null && data.latedayLow !== null && data.latedayClose !== null) {
-    const pv = floorPivot(data.latedayHigh, data.latedayLow, data.latedayClose);
-    add(pv.p,  'Pivot', 'tag-pivot',   4);
-    add(pv.r1, 'R1',    'tag-pivot-r', 3);
-    add(pv.r2, 'R2',    'tag-pivot-r', 3);
-    add(pv.r3, 'R3',    'tag-pivot-r', 2);
-    add(pv.s1, 'S1',    'tag-pivot-s', 3);
-    add(pv.s2, 'S2',    'tag-pivot-s', 3);
-    add(pv.s3, 'S3',    'tag-pivot-s', 2);
-    data._pivot = pv.p;
-  }
-
-  // ── Bollinger Bands ───────────────────────────────────────────────────────
-  add(data.bbUpper,  'BB Upper',  'tag-bb', 1);
-  add(data.bbMiddle, 'BB Middle', 'tag-bb', 2);
-  add(data.bbLower,  'BB Lower',  'tag-bb', 1);
 
   return levels;
 }
 
-// ─── Confluence engine ───────────────────────────────────────────────────────
+// ─── Confluence merge ─────────────────────────────────────────────────────────
 
-/**
- * Groups raw levels that fall within `window` points of each other.
- * Returns merged levels sorted by total weight (confluence score) descending.
- */
-function mergeConfluences(rawLevels, window) {
-  // Sort by price
-  const sorted = [...rawLevels].sort((a, b) => a.price - b.price);
+function merge(levels, win) {
+  const sorted = [...levels].sort((a, b) => a.price - b.price);
   const groups = [];
 
-  for (const lvl of sorted) {
-    // Try to find an existing group within window
-    let placed = false;
-    for (const g of groups) {
-      if (Math.abs(lvl.price - g.centerPrice) <= window) {
-        g.members.push(lvl);
-        // Recalculate center as weighted average
-        const totalW = g.members.reduce((s, m) => s + m.weight, 0);
-        g.centerPrice = Math.round(
-          (g.members.reduce((s, m) => s + m.price * m.weight, 0) / totalW) * 4
-        ) / 4;
-        g.totalWeight += lvl.weight;
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) {
-      groups.push({
-        centerPrice: lvl.price,
-        members: [lvl],
-        totalWeight: lvl.weight,
-      });
+  for (const lv of sorted) {
+    const g = groups.find(g => Math.abs(lv.price - g.price) <= win);
+    if (g) {
+      g.members.push(lv);
+      g.weight += lv.weight;
+      // weighted average price
+      const tw = g.members.reduce((s,m) => s+m.weight, 0);
+      g.price  = Math.round(g.members.reduce((s,m) => s+m.price*m.weight, 0) / tw);
+    } else {
+      groups.push({ price: lv.price, members: [lv], weight: lv.weight });
     }
   }
 
-  // Sort by total weight descending
-  groups.sort((a, b) => b.totalWeight - a.totalWeight);
-  return groups;
+  return groups.sort((a, b) => b.weight - a.weight);
 }
 
-// ─── Render helpers ──────────────────────────────────────────────────────────
+// ─── Render ───────────────────────────────────────────────────────────────────
 
-function tagHTML(label, tagClass) {
-  return `<span class="tag ${tagClass}">${label}</span>`;
+function tag(label, cls) { return `<span class="tag ${cls}">${label}</span>`; }
+
+function dots(w, max) {
+  const n = 5, filled = Math.min(n, Math.round(w/max*n));
+  const cls = filled >= 4 ? 'on top' : filled >= 3 ? 'on hi' : 'on';
+  return '<div class="conf-dots">' +
+    Array.from({length: n}, (_, i) => `<span class="dot ${i < filled ? cls : ''}"></span>`).join('') +
+    '</div>';
 }
 
-function scoreDotsHTML(weight, maxWeight) {
-  const MAX_DOTS = 5;
-  const filled = Math.min(MAX_DOTS, Math.round((weight / maxWeight) * MAX_DOTS));
-  let cls = 'filled';
-  if (filled >= 4) cls = 'filled critical';
-  else if (filled >= 3) cls = 'filled high';
-
-  let dots = '';
-  for (let i = 0; i < MAX_DOTS; i++) {
-    dots += `<span class="dot ${i < filled ? cls : ''}"></span>`;
-  }
-  return `<div class="confluence-score">
-    <div class="score-dots">${dots}</div>
-    <span class="score-num">${weight}</span>
-  </div>`;
-}
-
-function isPivot(members) {
-  return members.some(m => m.tagClass === 'tag-pivot' && m.label === 'Pivot');
-}
-
-// ─── Main calculate ──────────────────────────────────────────────────────────
+// ─── Main calculate ───────────────────────────────────────────────────────────
 
 function calculate() {
-  const data = {
-    lifeHigh:     v('life-high'),
-    lifeLow:      v('life-low'),
-    yearHigh:     v('year-high'),
-    yearLow:      v('year-low'),
-    quarterHigh:  v('quarter-high'),
-    quarterLow:   v('quarter-low'),
-    monthHigh:    v('month-high'),
-    monthLow:     v('month-low'),
-    weekHigh:     v('week-high'),
-    weekLow:      v('week-low'),
-    prevdayHigh:  v('prevday-high'),
-    prevdayLow:   v('prevday-low'),
-    prevdayOpen:  v('prevday-open'),
-    overnightHigh: v('overnight-high'),
-    overnightLow:  v('overnight-low'),
-    latedayHigh:  v('lateday-high'),
-    latedayLow:   v('lateday-low'),
-    latedayClose: v('lateday-close'),
-    bbUpper:      v('bb-upper'),
-    bbMiddle:     v('bb-middle'),
-    bbLower:      v('bb-lower'),
-    _pivot:       null,
+  const d = {
+    yearH:  g('year-high'),    yearL:  g('year-low'),
+    qtrH:   g('quarter-high'), qtrL:   g('quarter-low'),
+    monthH: g('month-high'),   monthL: g('month-low'),
+    weekH:  g('week-high'),    weekL:  g('week-low'),
+    pdH:    g('pd-high'),      pdL:    g('pd-low'),
+    onH:    g('on-high'),      onL:    g('on-low'),
+    pvH:    g('pivot-h'),      pvL:    g('pivot-l'), pvC: g('pivot-c'),
+    _pivot: null,
   };
 
-  const window = parseFloat(document.getElementById('confluence-window').value) || 3;
-  const maxLevels = parseInt(document.getElementById('max-levels').value) || 15;
+  const win      = parseInt(document.getElementById('conf-window').value) || 2;
+  const maxLvls  = parseInt(document.getElementById('max-levels').value)  || 15;
 
-  const rawLevels = buildRawLevels(data);
+  const raw    = buildLevels(d);
+  const anchor = d._pivot ?? d.onH ?? d.pdH;
 
-  if (rawLevels.length === 0) {
-    document.getElementById('levels-table-wrap').innerHTML =
-      '<p class="placeholder-text">No valid data entered. Please fill in at least one timeframe.</p>';
-    return;
-  }
+  // Filter to ±60 pts of anchor, always keep pivot R/S
+  const pivotTags = new Set(['tag-pivot','tag-r','tag-s']);
+  const filtered = anchor !== null
+    ? raw.filter(l => pivotTags.has(l.tag) || Math.abs(l.price - anchor) <= 60)
+    : raw;
 
-  // Anchor price: pivot if available
-  const anchor = data._pivot
-    ?? (data.overnightHigh && data.overnightLow ? mid(data.overnightHigh, data.overnightLow) : null)
-    ?? data.prevdayLow;
+  const groups  = merge(filtered, win);
+  const maxW    = groups[0]?.weight || 1;
 
-  // Filter: keep pivot R/S levels always, keep multi-TF levels only within ±60 pts of anchor
-  const RANGE = 60;
-  const filteredLevels = anchor !== null
-    ? rawLevels.filter(l =>
-        l.tagClass === 'tag-pivot' ||
-        l.tagClass === 'tag-pivot-r' ||
-        l.tagClass === 'tag-pivot-s' ||
-        Math.abs(l.price - anchor) <= RANGE
-      )
-    : rawLevels;
+  // Pin pivot group
+  const pivotGroup = groups.find(g => g.members.some(m => m.tag === 'tag-pivot'));
+  if (pivotGroup && d._pivot !== null) pivotGroup.price = d._pivot;
 
-  const groups = mergeConfluences(filteredLevels, window);
-  const maxWeight = groups[0]?.totalWeight || 1;
-
-  // Ensure exactly one pivot group
-  const pivotGroups = groups.filter(g => isPivot(g.members));
-  if (pivotGroups.length > 1) {
-    const primary = pivotGroups[0];
-    for (let i = 1; i < pivotGroups.length; i++) {
-      primary.members.push(...pivotGroups[i].members);
-      primary.totalWeight += pivotGroups[i].totalWeight;
-      const idx = groups.indexOf(pivotGroups[i]);
-      if (idx > -1) groups.splice(idx, 1);
-    }
-    const totalW = primary.members.reduce((s, m) => s + m.weight, 0);
-    primary.centerPrice = Math.round(primary.members.reduce((s, m) => s + m.price * m.weight, 0) / totalW);
-  }
-
-  const pivotPrice = data._pivot;
-  let finalGroups;
-
-  if (pivotPrice !== null) {
-    const pivotGroup = groups.find(g => isPivot(g.members));
-    if (pivotGroup) pivotGroup.centerPrice = pivotPrice;
-
-    const aboveGroups = groups.filter(g => g !== pivotGroup && g.centerPrice > pivotPrice)
-                              .sort((a, b) => a.centerPrice - b.centerPrice);
-    const belowGroups = groups.filter(g => g !== pivotGroup && g.centerPrice < pivotPrice)
-                              .sort((a, b) => b.centerPrice - a.centerPrice);
-
-    const half = Math.floor((maxLevels - 1) / 2);
-    const above = aboveGroups.slice(-half).reverse();
-    const below = belowGroups.slice(0, half);
-
-    finalGroups = [...above];
-    if (pivotGroup) finalGroups.push(pivotGroup);
-    finalGroups = finalGroups.concat(below);
+  // Split above/below pivot for balanced display
+  let final;
+  if (d._pivot !== null && pivotGroup) {
+    const above = groups.filter(g => g !== pivotGroup && g.price > d._pivot)
+                        .sort((a, b) => a.price - b.price);
+    const below = groups.filter(g => g !== pivotGroup && g.price < d._pivot)
+                        .sort((a, b) => b.price - a.price);
+    const half  = Math.floor((maxLvls - 1) / 2);
+    final = [
+      ...above.slice(-half).reverse(),
+      pivotGroup,
+      ...below.slice(0, half),
+    ];
   } else {
-    finalGroups = groups.slice(0, maxLevels).sort((a, b) => b.centerPrice - a.centerPrice);
+    final = groups.slice(0, maxLvls).sort((a, b) => b.price - a.price);
   }
 
-  // ── Debug panel ───────────────────────────────────────────────────────────
-  const dbg = document.getElementById('debug-panel');
-  dbg.classList.remove('hidden');
-  if (data.floorPivot !== null) {
-    dbg.innerHTML = `<strong>Pivot:</strong> ${data.floorPivot} (manually entered) &nbsp;|&nbsp; Late Day H:${data.latedayHigh ?? '—'} L:${data.latedayLow ?? '—'}`;
-  } else if (data.latedayHigh !== null && data.latedayLow !== null && data.latedayClose !== null) {
-    const pv = floorPivot(data.latedayHigh, data.latedayLow, data.latedayClose);
-    dbg.innerHTML = `<strong>Auto Pivot:</strong> ${pv.p} from late-day H:${data.latedayHigh} L:${data.latedayLow} C:${data.latedayClose}`;
-  } else {
-    dbg.innerHTML = `<strong>Enter pivot</strong> in Floor Pivot field above.`;
-  }
-
-  // ── Pivot badge & bias bar ────────────────────────────────────────────────
-  const pivotBadge = document.getElementById('pivot-badge');
+  // Bias bar
   const biasBar = document.getElementById('bias-bar');
-  const biasText = document.getElementById('bias-text');
-
-  if (data._pivot !== null) {
-    pivotBadge.textContent = `Pivot: ${data._pivot}`;
-    pivotBadge.classList.remove('hidden');
-
-    const lastPrice = data.overnightHigh !== null && data.overnightLow !== null
-      ? mid(data.overnightHigh, data.overnightLow) : null;
-    if (lastPrice !== null) {
-      biasBar.classList.remove('hidden', 'bullish', 'bearish', 'neutral');
-      if (lastPrice > data._pivot + window) {
-        biasBar.classList.add('bullish');
-        biasText.textContent = `▲ Bullish bias — overnight midpoint (${lastPrice}) is above pivot (${data._pivot}). Favor longs on pullbacks.`;
-      } else if (lastPrice < data._pivot - window) {
-        biasBar.classList.add('bearish');
-        biasText.textContent = `▼ Bearish bias — overnight midpoint (${lastPrice}) is below pivot (${data._pivot}). Favor shorts on rallies.`;
-      } else {
-        biasBar.classList.add('neutral');
-        biasText.textContent = `◆ Neutral — overnight midpoint (${lastPrice}) is near pivot (${data._pivot}). Wait for direction.`;
-      }
-    } else {
-      biasBar.classList.add('hidden');
-    }
+  if (d._pivot !== null && d.onH !== null && d.onL !== null) {
+    const onMid = mid(d.onH, d.onL);
+    biasBar.classList.remove('hidden', 'bull', 'bear', 'neut');
+    if (onMid > d._pivot + 3)      { biasBar.classList.add('bull'); biasBar.textContent = `▲ Bullish — ON midpoint ${onMid} above pivot ${d._pivot}. Favor longs on pullbacks.`; }
+    else if (onMid < d._pivot - 3) { biasBar.classList.add('bear'); biasBar.textContent = `▼ Bearish — ON midpoint ${onMid} below pivot ${d._pivot}. Favor shorts on rallies.`; }
+    else                           { biasBar.classList.add('neut'); biasBar.textContent = `◆ Neutral — ON midpoint ${onMid} near pivot ${d._pivot}.`; }
   } else {
-    pivotBadge.classList.add('hidden');
     biasBar.classList.add('hidden');
   }
 
-  // ── Main levels table ─────────────────────────────────────────────────────
-  let tableHTML = `
-    <table class="levels-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Price</th>
-          <th>Confluence</th>
-          <th>Sources</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
+  // Table
+  let html = `<table class="levels-table">
+    <thead><tr><th>#</th><th>Price</th><th>Strength</th><th>Sources</th></tr></thead><tbody>`;
 
-  finalGroups.forEach((g, i) => {
-    const hasPivot = isPivot(g.members);
-    const priceClass = hasPivot ? 'level-price pivot-price' : 'level-price';
-    const tags = g.members.map(m => tagHTML(m.label, m.tagClass)).join('');
-    tableHTML += `
-      <tr>
-        <td style="color:var(--muted);font-size:12px">${i + 1}</td>
-        <td><span class="${priceClass}">${g.centerPrice}</span></td>
-        <td>${scoreDotsHTML(g.totalWeight, maxWeight)}</td>
-        <td><div class="tags">${tags}</div></td>
-      </tr>
-    `;
+  final.forEach((g, i) => {
+    const isPvt = g.members.some(m => m.tag === 'tag-pivot');
+    const tags  = g.members.map(m => tag(m.label, m.tag)).join('');
+    html += `<tr>
+      <td style="color:var(--muted);font-size:11px">${i+1}</td>
+      <td><span class="price${isPvt ? ' is-pivot' : ''}">${g.price}</span></td>
+      <td>${dots(g.weight, maxW)}</td>
+      <td><div class="tags">${tags}</div></td>
+    </tr>`;
   });
 
-  tableHTML += '</tbody></table>';
-  document.getElementById('levels-table-wrap').innerHTML = tableHTML;
-
-  // ── Confluence zones ──────────────────────────────────────────────────────
-  const multiGroups = groups.filter(g => g.members.length > 1);
-  const confSection = document.getElementById('confluence-section');
-  const confList = document.getElementById('confluence-list');
-
-  if (multiGroups.length > 0) {
-    confSection.classList.remove('hidden');
-    confList.innerHTML = multiGroups.slice(0, 10).map(g => {
-      const tags = g.members.map(m => tagHTML(m.label, m.tagClass)).join('');
-      return `<div class="confluence-zone">
-        <span class="zone-price">${g.centerPrice}</span>
-        <span class="zone-count">${g.members.length} sources</span>
-        <div class="tags">${tags}</div>
-      </div>`;
-    }).join('');
-  } else {
-    confSection.classList.add('hidden');
-  }
-
-  // ── Raw levels ────────────────────────────────────────────────────────────
-  const rawSection = document.getElementById('raw-section');
-  const rawList = document.getElementById('raw-list');
-  rawSection.classList.remove('hidden');
-
-  const sortedRaw = [...filteredLevels].sort((a, b) => b.price - a.price);
-  rawList.innerHTML = `<div class="raw-grid">` +
-    sortedRaw.map(l => `
-      <div class="raw-item">
-        <span class="raw-item-price">${l.price}</span>
-        <span class="raw-item-label">${l.label}</span>
-      </div>
-    `).join('') +
-    `</div>`;
+  html += '</tbody></table>';
+  document.getElementById('levels-out').innerHTML = html;
 }
 
-
+// ─── Clear ────────────────────────────────────────────────────────────────────
 
 function clearAll() {
-  document.querySelectorAll('.input-row input').forEach(el => {
-    el.value = '';
-    el.classList.remove('auto-filled');
+  document.querySelectorAll('input[type=number]').forEach(el => {
+    el.value = ''; el.classList.remove('filled');
   });
-  document.getElementById('levels-table-wrap').innerHTML =
-    '<p class="placeholder-text">Click "Fetch Live Data" to auto-fill, then "Calculate Key Levels"</p>';
-  document.getElementById('confluence-section').classList.add('hidden');
-  document.getElementById('raw-section').classList.add('hidden');
-  document.getElementById('pivot-badge').classList.add('hidden');
+  document.getElementById('levels-out').innerHTML = '<p class="placeholder">Fetch data, enter pivot H·L·C, then Calculate.</p>';
   document.getElementById('bias-bar').classList.add('hidden');
   document.getElementById('auto-badge').classList.add('hidden');
   document.getElementById('fetch-status').textContent = '';
-  document.getElementById('fetch-status').className = 'fetch-status';
-  document.getElementById('pivot-preview').classList.add('hidden');
+  document.getElementById('fetch-status').className = 'status';
+  document.getElementById('pivot-preview').innerHTML = '';
 }
 
-// ─── Event listeners ─────────────────────────────────────────────────────────
+// ─── Wire up ──────────────────────────────────────────────────────────────────
 
-document.getElementById('calculate-btn').addEventListener('click', calculate);
+document.getElementById('calc-btn').addEventListener('click', calculate);
 document.getElementById('clear-btn').addEventListener('click', clearAll);
-
-document.querySelectorAll('.input-row input').forEach(el => {
-  el.addEventListener('keydown', e => { if (e.key === 'Enter') calculate(); });
-});
-
-// ── Live pivot preview as user types the RTH close ────────────────────────
-function updatePivotPreview() {
-  const h = v('lateday-high');
-  const l = v('lateday-low');
-  const c = v('lateday-close');
-  const preview = document.getElementById('pivot-preview');
-  if (!preview) return;
-  if (h && l && c) {
-    const pv = floorPivot(h, l, c);
-    preview.classList.remove('hidden');
-    preview.innerHTML = `Pivot → <strong>${pv.p}</strong> &nbsp; R1:${pv.r1} R2:${pv.r2} R3:${pv.r3} &nbsp; S1:${pv.s1} S2:${pv.s2} S3:${pv.s3}`;
-  } else {
-    preview.classList.add('hidden');
-  }
-}
-
-['lateday-high','lateday-low','lateday-close'].forEach(id => {
-  document.getElementById(id)?.addEventListener('input', updatePivotPreview);
-});
+document.querySelectorAll('input[type=number]').forEach(el =>
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') calculate(); })
+);

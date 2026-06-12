@@ -3,155 +3,104 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Saul Shaoul ES Key Levels</title>
+  <title>ES Key Levels — Saul Shaoul</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>ES Key Levels Calculator</h1>
-      <p class="subtitle">Saul Shaoul Multi-Timeframe Methodology</p>
+      <h1>ES Key Levels</h1>
+      <p class="subtitle">Saul Shaoul Methodology</p>
     </header>
 
-    <!-- FETCH BAR -->
-    <div class="fetch-bar">
-      <div class="fetch-left">
-        <label class="fetch-label">Symbol
-          <input type="text" id="symbol-input" value="ES=F" placeholder="ES=F" />
-        </label>
-        <button id="fetch-btn" class="btn-fetch">⬇ Fetch Live Data</button>
-        <button id="calculate-btn" class="btn-primary">Calculate Key Levels</button>
-        <button id="clear-btn" class="btn-ghost">Clear All</button>
-        <span id="fetch-status" class="fetch-status"></span>
-      </div>
-      <div class="fetch-right">
-        <span class="fetch-note">Data via Yahoo Finance · fields auto-filled, manual override allowed</span>
-      </div>
+    <!-- TOP BAR -->
+    <div class="top-bar">
+      <label class="sym-label">Symbol
+        <input type="text" id="symbol-input" value="ES=F" />
+      </label>
+      <button id="fetch-btn" class="btn-accent">⬇ Fetch Data</button>
+      <button id="calc-btn" class="btn-primary">Calculate Levels</button>
+      <button id="clear-btn" class="btn-ghost">Clear</button>
+      <span id="fetch-status" class="status"></span>
     </div>
 
     <div class="main-grid">
-      <!-- INPUT PANEL -->
-      <section class="input-panel">
-        <h2>Timeframe Data <span class="auto-badge hidden" id="auto-badge">AUTO-FILLED</span></h2>
+      <!-- LEFT: INPUTS -->
+      <aside class="input-panel">
 
-        <div class="tf-group">
-          <h3>Life of Contract</h3>
-          <div class="input-row">
-            <label>High <input type="number" id="life-high" placeholder="e.g. 6166" step="1" /></label>
-            <label>Low  <input type="number" id="life-low"  placeholder="e.g. 800"  step="1" /></label>
+        <!-- PIVOT SECTION — most important, top -->
+        <div class="section pivot-section">
+          <div class="section-title">Floor Pivot
+            <span class="section-note">enter H · L · C from your broker</span>
+          </div>
+          <div class="field-row">
+            <label>H <input type="number" id="pivot-h" step="1" placeholder="—" /></label>
+            <label>L <input type="number" id="pivot-l" step="1" placeholder="—" /></label>
+            <label>C <input type="number" id="pivot-c" step="1" placeholder="—" /></label>
+          </div>
+          <div id="pivot-preview" class="pivot-preview"></div>
+        </div>
+
+        <!-- MULTI-TIMEFRAME — auto-filled -->
+        <div class="section">
+          <div class="section-title">Multi-Timeframe
+            <span class="section-note auto-note" id="auto-badge">auto-filled</span>
+          </div>
+
+          <div class="tf-row">
+            <span class="tf-label">Year</span>
+            <label>H <input type="number" id="year-high" step="1" /></label>
+            <label>L <input type="number" id="year-low"  step="1" /></label>
+          </div>
+          <div class="tf-row">
+            <span class="tf-label">Quarter</span>
+            <label>H <input type="number" id="quarter-high" step="1" /></label>
+            <label>L <input type="number" id="quarter-low"  step="1" /></label>
+          </div>
+          <div class="tf-row">
+            <span class="tf-label">Month</span>
+            <label>H <input type="number" id="month-high" step="1" /></label>
+            <label>L <input type="number" id="month-low"  step="1" /></label>
+          </div>
+          <div class="tf-row">
+            <span class="tf-label">Week</span>
+            <label>H <input type="number" id="week-high" step="1" /></label>
+            <label>L <input type="number" id="week-low"  step="1" /></label>
+          </div>
+          <div class="tf-row">
+            <span class="tf-label">Prev Day</span>
+            <label>H <input type="number" id="pd-high"  step="1" /></label>
+            <label>L <input type="number" id="pd-low"   step="1" /></label>
+          </div>
+          <div class="tf-row">
+            <span class="tf-label">Overnight</span>
+            <label>H <input type="number" id="on-high" step="1" /></label>
+            <label>L <input type="number" id="on-low"  step="1" /></label>
           </div>
         </div>
 
-        <div class="tf-group">
-          <h3>Year</h3>
-          <div class="input-row">
-            <label>High <input type="number" id="year-high" step="1" /></label>
-            <label>Low  <input type="number" id="year-low"  step="1" /></label>
-          </div>
-        </div>
-
-        <div class="tf-group">
-          <h3>Quarter</h3>
-          <div class="input-row">
-            <label>High <input type="number" id="quarter-high" step="1" /></label>
-            <label>Low  <input type="number" id="quarter-low"  step="1" /></label>
-          </div>
-        </div>
-
-        <div class="tf-group">
-          <h3>Month</h3>
-          <div class="input-row">
-            <label>High <input type="number" id="month-high" step="1" /></label>
-            <label>Low  <input type="number" id="month-low"  step="1" /></label>
-          </div>
-        </div>
-
-        <div class="tf-group">
-          <h3>Week</h3>
-          <div class="input-row">
-            <label>High <input type="number" id="week-high" step="1" /></label>
-            <label>Low  <input type="number" id="week-low"  step="1" /></label>
-          </div>
-        </div>
-
-        <div class="tf-group">
-          <h3>Previous Day</h3>
-          <div class="input-row">
-            <label>High  <input type="number" id="prevday-high"  step="1" /></label>
-            <label>Low   <input type="number" id="prevday-low"   step="1" /></label>
-            <label>Open  <input type="number" id="prevday-open"  step="1" /></label>
-          </div>
-        </div>
-
-        <div class="tf-group">
-          <h3>Overnight / Globex</h3>
-          <div class="input-row">
-            <label>High <input type="number" id="overnight-high" step="1" /></label>
-            <label>Low  <input type="number" id="overnight-low"  step="1" /></label>
-          </div>
-        </div>
-
-        <div class="tf-group">
-          <h3>Late Day (4:35–4:45 pm) <span class="tf-note">used for pivot</span></h3>
-          <div class="input-row">
-            <label>High  <input type="number" id="lateday-high"  step="1" /></label>
-            <label>Low   <input type="number" id="lateday-low"   step="1" /></label>
-            <label>Close <input type="number" id="lateday-close" step="1" /></label>
-          </div>
-          <div id="pivot-preview" class="pivot-preview hidden"></div>
-        </div>
-
-        <div class="tf-group">
-          <h3>Bollinger Bands <span class="tf-note">(auto-calculated or manual)</span></h3>
-          <div class="input-row">
-            <label>Upper  <input type="number" id="bb-upper"  step="1" /></label>
-            <label>Middle <input type="number" id="bb-middle" step="1" /></label>
-            <label>Lower  <input type="number" id="bb-lower"  step="1" /></label>
-          </div>
-        </div>
-
-        <div class="tf-group">
-          <h3>Settings</h3>
-          <div class="input-row">
-            <label>Confluence window (pts)
-              <input type="number" id="confluence-window" value="1" min="0" step="1" />
-            </label>
+        <!-- SETTINGS -->
+        <div class="section">
+          <div class="section-title">Settings</div>
+          <div class="field-row">
             <label>Max levels
               <input type="number" id="max-levels" value="15" min="5" max="30" step="1" />
             </label>
+            <label>Confluence (pts)
+              <input type="number" id="conf-window" value="2" min="0" step="1" />
+            </label>
           </div>
         </div>
 
+      </aside>
 
-      </section>
-
-      <!-- OUTPUT PANEL -->
-      <section class="output-panel">
-        <div class="output-header">
-          <h2>Key Levels</h2>
-          <div id="pivot-badge" class="pivot-badge hidden"></div>
+      <!-- RIGHT: OUTPUT -->
+      <main class="output-panel">
+        <div id="bias-bar" class="bias-bar hidden"></div>
+        <div id="levels-out">
+          <p class="placeholder">Fetch data, enter pivot H·L·C, then Calculate.</p>
         </div>
-
-        <div id="bias-bar" class="bias-bar hidden">
-          <span id="bias-text"></span>
-        </div>
-
-        <div id="debug-panel" class="debug-panel hidden"></div>
-
-        <div id="levels-table-wrap">
-          <p class="placeholder-text">Click "Fetch Live Data" to auto-fill, then "Calculate Key Levels"</p>
-        </div>
-
-        <div id="confluence-section" class="hidden">
-          <h3>Confluence Zones</h3>
-          <div id="confluence-list"></div>
-        </div>
-
-        <div id="raw-section" class="hidden">
-          <h3>All Raw Levels</h3>
-          <div id="raw-list"></div>
-        </div>
-      </section>
+      </main>
     </div>
   </div>
 
