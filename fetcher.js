@@ -81,18 +81,44 @@ async function fetchData() {
   const sym = document.getElementById('symbol-input').value.trim() || 'ES=F';
   setStatus('loading', `Fetching ${sym}…`);
 
-  let daily, intra;
+  let daily, intra, tdBars;
 
+  // ── Yahoo: multi-timeframe daily bars ────────────────────────────────────
   try {
     daily = parseBars(await yFetch(sym, '1d', '2y'));
   } catch(e) {
     setStatus('error', `Failed: ${e.message}`); return;
   }
 
+  // ── Yahoo: intraday for overnight ─────────────────────────────────────────
   try {
     intra = parseBars(await yFetch(sym, '5m', '5d'));
   } catch(e) {
     intra = [];
+  }
+
+  // ── TwelveData: daily bars for pivot H/L/C (RTH-only) ────────────────────
+  // ES/USD is TwelveData's symbol for E-mini S&P 500 futures
+  try {
+    const tdSym = sym === 'ES=F' ? 'ES/USD' : sym;
+    const res = await fetch(`/td?symbol=${encodeURIComponent(tdSym)}&interval=1day&outputsize=5&order=desc`);
+    if (res.ok) {
+      const j = await res.json();
+      if (j.values && j.values.length > 0) {
+        tdBars = j.values.map(v => ({
+          date: v.datetime,
+          h: Math.round(parseFloat(v.high)),
+          l: Math.round(parseFloat(v.low)),
+          c: Math.round(parseFloat(v.close)),
+          o: Math.round(parseFloat(v.open)),
+        }));
+        console.log('TwelveData bars:', tdBars);
+      } else {
+        console.warn('TwelveData no values:', j);
+      }
+    }
+  } catch(e) {
+    console.warn('TwelveData fetch failed:', e.message);
   }
 
   const now   = new Date();
@@ -118,6 +144,15 @@ async function fetchData() {
   const on       = hl(onBars);
 
   // Fill fields
+  // Fill pivot H/L/C from TwelveData prev day (index 1 = yesterday, 0 = today/latest)
+  // TwelveData daily bars are RTH-only for futures
+  if (tdBars && tdBars.length >= 2) {
+    const prevTD = tdBars[1]; // most recent completed session
+    setField('pivot-h', prevTD.h);
+    setField('pivot-l', prevTD.l);
+    setField('pivot-c', prevTD.c);
+  }
+
   setField('year-high',     yr.h);  setField('year-low',     yr.l);
   setField('quarter-high',  qtr.h); setField('quarter-low',  qtr.l);
   setField('month-high',    mo.h);  setField('month-low',    mo.l);
@@ -129,9 +164,10 @@ async function fetchData() {
 
   document.getElementById('auto-badge').classList.remove('hidden');
 
-  const onNote = on.h ? '' : ' · overnight unavailable';
-  const pdNote = pdBar ? ` · prev day ${etDateStr(pdBar.t)}` : '';
-  setStatus('ok', `Filled${pdNote}${onNote} · enter pivot H·L·C`);
+  const tdNote  = tdBars ? ` · pivot from TwelveData` : ' · enter pivot H·L·C manually';
+  const onNote  = on.h ? '' : ' · overnight unavailable';
+  const pdNote  = pdBar ? ` · prev day ${etDateStr(pdBar.t)}` : '';
+  setStatus('ok', `Filled${pdNote}${tdNote}${onNote}`);
 }
 
 function setStatus(type, msg) {
