@@ -10,9 +10,12 @@ Debug raw Yahoo data: http://localhost:8080/debug?symbol=ES=F&interval=1d&range=
 """
 
 import json
+import os
 import urllib.request
 import urllib.parse
 from http.server import HTTPServer, SimpleHTTPRequestHandler
+
+TWELVEDATA_KEY = os.environ.get('TWELVEDATA_API_KEY', '')
 
 YAHOO_HEADERS = {
     "User-Agent": (
@@ -67,6 +70,27 @@ class Handler(SimpleHTTPRequestHandler):
                 self._respond(200, data)
             except urllib.error.HTTPError as e:
                 self._respond(e.code, {"error": str(e)})
+            except Exception as e:
+                self._respond(500, {"error": str(e)})
+            return
+
+        # ── TwelveData proxy: /td?symbol=ES/USD&interval=1day&outputsize=30 ─────
+        if self.path.startswith("/td?"):
+            if not TWELVEDATA_KEY:
+                self._respond(503, {"error": "TWELVEDATA_API_KEY not configured"})
+                return
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            # Build TwelveData URL, injecting the API key server-side
+            qs = urllib.parse.urlencode({k: v[0] for k, v in params.items()})
+            url = f"https://api.twelvedata.com/time_series?{qs}&apikey={TWELVEDATA_KEY}"
+            try:
+                req = urllib.request.Request(url, headers={"Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read()
+                data = json.loads(raw)
+                print(f"[td] {params.get('symbol',['?'])[0]} {params.get('interval',['?'])[0]} status={data.get('status','?')}")
+                self._respond(200, data)
             except Exception as e:
                 self._respond(500, {"error": str(e)})
             return

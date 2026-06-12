@@ -5,3 +5,5 @@ services:
     ports:
       - "8080:8080"
     restart: unless-stopped
+    environment:
+      - TWELVEDATA_API_KEY=${TWELVEDATA_API_KEY}
