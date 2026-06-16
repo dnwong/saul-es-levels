@@ -88,8 +88,9 @@ class Handler(SimpleHTTPRequestHandler):
                 with urllib.request.urlopen(req, timeout=15) as resp:
                     raw = resp.read()
                 data = json.loads(raw)
-                # Show all results, not just futures
-                self._respond(200, {"all": data.get('data', [])[:20], "futures": futures[:20]})
+                all_results = data.get('data', [])
+                futures = [d for d in all_results if d.get('instrument_type') == 'Futures']
+                self._respond(200, {"all": all_results[:20], "futures": futures[:20]})
             except Exception as e:
                 self._respond(500, {"error": str(e)})
             return
