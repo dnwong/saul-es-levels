@@ -97,10 +97,12 @@ async function fetchData() {
     intra = [];
   }
 
-  // ── TwelveData: daily bars for pivot H/L/C (RTH-only) ────────────────────
+  // ── TwelveData: daily bars for pivot H/L/C ───────────────────────────────
+  // Use SPY (RTH-only ETF) as proxy since ES futures require paid tier
+  // SPY × multiplier ≈ ES. We use SPY * (ES_price / SPY_price) ratio.
+  // Actually use SPX index which is available free and tracks ES directly
   try {
-    const tdSym = sym === 'ES=F' ? 'ES/USD' : sym;
-    const res = await fetch(`/td?symbol=${encodeURIComponent(tdSym)}&interval=1day&outputsize=5&order=desc`);
+    const res = await fetch(`/td?symbol=SPX&interval=1day&outputsize=5&order=desc`);
     if (res.ok) {
       const j = await res.json();
       if (j.values && j.values.length > 0) {
@@ -111,10 +113,13 @@ async function fetchData() {
           c: Math.round(parseFloat(v.close)),
           o: Math.round(parseFloat(v.open)),
         }));
-        console.log('TwelveData bars:', tdBars);
+        console.log('TwelveData SPX bars:', tdBars);
       } else {
         console.warn('TwelveData no values:', j);
       }
+    } else {
+      const err = await res.json();
+      console.warn('TwelveData error:', err);
     }
   } catch(e) {
     console.warn('TwelveData fetch failed:', e.message);
