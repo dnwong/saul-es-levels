@@ -97,23 +97,29 @@ async function fetchData() {
     intra = [];
   }
 
-  // ── TwelveData: daily bars for pivot H/L/C ───────────────────────────────
-  // Use SPY (RTH-only ETF) as proxy since ES futures require paid tier
-  // SPY × multiplier ≈ ES. We use SPY * (ES_price / SPY_price) ratio.
-  // Actually use SPX index which is available free and tracks ES directly
+  // ── TwelveData: SPY daily bars (RTH-only, free tier) ─────────────────────
+  // SPY × ~10 ≈ ES. We fetch SPY and scale to ES equivalent.
+  // This gives clean RTH H/L/C for pivot calculation.
   try {
-    const res = await fetch(`/td?symbol=SPX&interval=1day&outputsize=5&order=desc`);
+    const res = await fetch(`/td?symbol=SPY&interval=1day&outputsize=5&order=desc`);
     if (res.ok) {
       const j = await res.json();
       if (j.values && j.values.length > 0) {
+        // Get the ratio from current ES price vs SPY price
+        // Use Yahoo's prev day bar as reference for the ratio
+        const esPrev  = pdBar ? (pdBar.h + pdBar.l + pdBar.c) / 3 : null;
+        const spyPrev = parseFloat(j.values[1]?.close);
+        const ratio   = esPrev && spyPrev ? esPrev / spyPrev : 10;
+        console.log(`SPY/ES ratio: ${ratio.toFixed(4)}`);
+
         tdBars = j.values.map(v => ({
           date: v.datetime,
-          h: Math.round(parseFloat(v.high)),
-          l: Math.round(parseFloat(v.low)),
-          c: Math.round(parseFloat(v.close)),
-          o: Math.round(parseFloat(v.open)),
+          h: Math.round(parseFloat(v.high)  * ratio),
+          l: Math.round(parseFloat(v.low)   * ratio),
+          c: Math.round(parseFloat(v.close) * ratio),
+          o: Math.round(parseFloat(v.open)  * ratio),
         }));
-        console.log('TwelveData SPX bars:', tdBars);
+        console.log('TwelveData SPY→ES bars:', tdBars);
       } else {
         console.warn('TwelveData no values:', j);
       }
