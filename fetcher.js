@@ -97,39 +97,41 @@ async function fetchData() {
     intra = [];
   }
 
-  // ── TwelveData: SPY daily bars (RTH-only, free tier) ─────────────────────
-  // SPY × ~10 ≈ ES. We fetch SPY and scale to ES equivalent.
-  // This gives clean RTH H/L/C for pivot calculation.
+  // ── Yahoo 1h bars: get RTH H/L/C for pivot ───────────────────────────────
+  // Fetch 1h bars for past 5 days and extract prev day RTH session (9:30-16:15 ET)
+  let hourBars = [];
   try {
-    const res = await fetch(`/td?symbol=SPY&interval=1day&outputsize=5&order=desc`);
-    if (res.ok) {
-      const j = await res.json();
-      if (j.values && j.values.length > 0) {
-        // Get the ratio from current ES price vs SPY price
-        // Use Yahoo's prev day bar as reference for the ratio
-        const esPrev  = pdBar ? (pdBar.h + pdBar.l + pdBar.c) / 3 : null;
-        const spyPrev = parseFloat(j.values[1]?.close);
-        const ratio   = esPrev && spyPrev ? esPrev / spyPrev : 10;
-        console.log(`SPY/ES ratio: ${ratio.toFixed(4)}`);
-
-        tdBars = j.values.map(v => ({
-          date: v.datetime,
-          h: Math.round(parseFloat(v.high)  * ratio),
-          l: Math.round(parseFloat(v.low)   * ratio),
-          c: Math.round(parseFloat(v.close) * ratio),
-          o: Math.round(parseFloat(v.open)  * ratio),
-        }));
-        console.log('TwelveData SPY→ES bars:', tdBars);
-      } else {
-        console.warn('TwelveData no values:', j);
-      }
-    } else {
-      const err = await res.json();
-      console.warn('TwelveData error:', err);
-    }
+    hourBars = parseBars(await yFetch(sym, '1h', '5d'));
   } catch(e) {
-    console.warn('TwelveData fetch failed:', e.message);
+    console.warn('Hour bars failed:', e.message);
   }
+
+  // Find prev day RTH 1h bars
+  let pivotH = null, pivotL = null, pivotC = null;
+  if (hourBars.length > 0 && pdBar) {
+    const prevDateStr = etDateStr(pdBar.t);
+    const prevMidUTC  = etMidnight(pdBar.t);
+    const rthStart    = prevMidUTC + 9.5  * 3600000;
+    const rthEnd      = prevMidUTC + 16.25 * 3600000;
+    const rthHours    = hourBars.filter(b => {
+      const ds = etDateStr(b.t);
+      return ds === prevDateStr && b.t >= rthStart && b.t <= rthEnd;
+    });
+    console.log(`RTH 1h bars for ${prevDateStr}:`, rthHours.map(b => {
+      const d = new Date(toET(b.t));
+      return `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2,'0')} H:${Math.round(b.h)} L:${Math.round(b.l)} C:${Math.round(b.c)}`;
+    }));
+    if (rthHours.length > 0) {
+      pivotH = Math.round(Math.max(...rthHours.map(b => b.h)));
+      pivotL = Math.round(Math.min(...rthHours.map(b => b.l)));
+      pivotC = Math.round(rthHours[rthHours.length - 1].c);
+    }
+  }
+
+  // Helper for ET conversion (needed for hour bar filtering)
+  function toET(utcMs) { return utcMs - etOffset(); }
+
+  // TwelveData SPY fallback removed - using Yahoo 1h RTH bars instead
 
   const now   = new Date();
   const today = etDateStr(now.getTime());
@@ -154,13 +156,11 @@ async function fetchData() {
   const on       = hl(onBars);
 
   // Fill fields
-  // Fill pivot H/L/C from TwelveData prev day (index 1 = yesterday, 0 = today/latest)
-  // TwelveData daily bars are RTH-only for futures
-  if (tdBars && tdBars.length >= 2) {
-    const prevTD = tdBars[1]; // most recent completed session
-    setField('pivot-h', prevTD.h);
-    setField('pivot-l', prevTD.l);
-    setField('pivot-c', prevTD.c);
+  // Fill pivot H/L/C from 1h RTH bars
+  if (pivotH !== null) {
+    setField('pivot-h', pivotH);
+    setField('pivot-l', pivotL);
+    setField('pivot-c', pivotC);
   }
 
   setField('year-high',     yr.h);  setField('year-low',     yr.l);
@@ -174,7 +174,7 @@ async function fetchData() {
 
   document.getElementById('auto-badge').classList.remove('hidden');
 
-  const tdNote  = tdBars ? ` · pivot from TwelveData` : ' · enter pivot H·L·C manually';
+  const tdNote  = pivotH ? ` · pivot from RTH 1h bars` : ' · enter pivot H·L·C manually';
   const onNote  = on.h ? '' : ' · overnight unavailable';
   const pdNote  = pdBar ? ` · prev day ${etDateStr(pdBar.t)}` : '';
   setStatus('ok', `Filled${pdNote}${tdNote}${onNote}`);
