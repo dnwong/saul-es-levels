@@ -136,12 +136,12 @@ function calculate() {
   const maxLvls  = parseInt(document.getElementById('max-levels').value)  || 15;
 
   const raw    = buildLevels(d);
-  const anchor = d._pivot ?? d.onH ?? d.pdH;
+  const anchor = d._pivot ?? d.onH ?? d.pdH ?? d.weekH;
 
-  // Filter to ±60 pts of anchor, always keep pivot R/S
+  // Filter to ±100 pts of anchor, always keep pivot R/S
   const pivotTags = new Set(['tag-pivot','tag-r','tag-s']);
   const filtered = anchor !== null
-    ? raw.filter(l => pivotTags.has(l.tag) || Math.abs(l.price - anchor) <= 60)
+    ? raw.filter(l => pivotTags.has(l.tag) || Math.abs(l.price - anchor) <= 100)
     : raw;
 
   const groups  = merge(filtered, win);
@@ -167,7 +167,6 @@ function calculate() {
   } else {
     final = groups.slice(0, maxLvls).sort((a, b) => b.price - a.price);
   }
-
   // Bias bar
   const biasBar = document.getElementById('bias-bar');
   if (d._pivot !== null && d.onH !== null && d.onL !== null) {
