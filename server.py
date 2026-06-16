@@ -74,6 +74,27 @@ class Handler(SimpleHTTPRequestHandler):
                 self._respond(500, {"error": str(e)})
             return
 
+        # ── TwelveData symbol search: /td-search?q=ES ────────────────────────
+        if self.path.startswith("/td-search?"):
+            if not TWELVEDATA_KEY:
+                self._respond(503, {"error": "TWELVEDATA_API_KEY not configured"})
+                return
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            q = params.get("q", ["ES"])[0]
+            url = f"https://api.twelvedata.com/symbol_search?symbol={urllib.parse.quote(q)}&apikey={TWELVEDATA_KEY}"
+            try:
+                req = urllib.request.Request(url, headers={"Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read()
+                data = json.loads(raw)
+                # Filter to futures only
+                futures = [d for d in data.get('data', []) if d.get('instrument_type') == 'Futures']
+                self._respond(200, {"futures": futures[:20]})
+            except Exception as e:
+                self._respond(500, {"error": str(e)})
+            return
+
         # ── TwelveData proxy: /td?symbol=ES/USD&interval=1day&outputsize=30 ─────
         if self.path.startswith("/td?"):
             if not TWELVEDATA_KEY:
